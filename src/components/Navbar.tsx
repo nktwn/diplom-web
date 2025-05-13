@@ -7,27 +7,23 @@ export default function Navbar() {
     const { user } = useAuth();
 
     return (
-        <nav className="bg-blue-600 text-white p-4 flex justify-between items-center">
-            {/* Left — Filters & Sort (stubs) */}
+        <nav className="bg-[var(--card-bg)] text-[var(--foreground)] p-4 flex justify-between items-center border-b border-[var(--card-border)]">
             <div className="space-x-4">
-                <button className="hover:underline">Filters</button>
-                <button className="hover:underline">Sort</button>
+                <button className="hover:text-[var(--primary)]">Filters</button>
+                <button className="hover:text-[var(--primary)]">Sort</button>
             </div>
-
-            {/* Center — Main navigation */}
             <div className="space-x-4 text-lg font-medium">
-                <Link href="/">Catalogue</Link>
-                <Link href="/cart">Cart</Link>
+                <Link href="/" className="hover:text-[var(--primary)]">Catalogue</Link>
+                <Link href="/cart" className="hover:text-[var(--primary)]">Cart</Link>
             </div>
-
-            {/* Right — Auth */}
             <div>
                 {user ? (
-                    <Link href="/profile" className="hover:underline">Profile</Link>
+                    <Link href="/profile" className="hover:text-[var(--primary)]">Profile</Link>
                 ) : (
-                    <Link href="/login" className="hover:underline">Login</Link>
+                    <Link href="/login" className="hover:text-[var(--primary)]">Login</Link>
                 )}
             </div>
         </nav>
+
     );
 }
