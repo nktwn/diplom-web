@@ -1,34 +1,35 @@
-import fs from "fs";
-import path from "path";
+const fs = require("fs");
+const path = require("path");
 
-const projectRoot = path.resolve(__dirname, "src");
+const projectRoot = path.resolve(__dirname); // корневая папка проекта
 const outputFile = path.resolve(__dirname, "project-export.txt");
 
-const allowedExtensions = [".ts", ".tsx", ".css", ".json", ".mjs"];
-const excludedFolders = ["node_modules", ".git", ".idea"];
+const codeExtensions = [".ts", ".tsx", ".json", ".mjs"];
+const excludedFolders = ["node_modules", ".next", ".idea", "public", ".git", ".gitignore", "README.md"];
 
-function walkDir(dir: string, callback: (filePath: string) => void) {
+function walkDirAll(dir, callback) {
     fs.readdirSync(dir).forEach((filename) => {
         const filePath = path.join(dir, filename);
         const stat = fs.statSync(filePath);
 
         if (stat.isDirectory()) {
             if (!excludedFolders.includes(filename)) {
-                walkDir(filePath, callback);
+                walkDirAll(filePath, callback);
             }
-        } else if (allowedExtensions.includes(path.extname(filename))) {
+        } else {
             callback(filePath);
         }
     });
 }
 
 function writeStructureAndFiles() {
-    const outputLines: string[] = [];
+    const outputLines = [];
 
     outputLines.push("# 📁 Структура проекта\n");
 
-    function writeTree(dir: string, depth = 0) {
-        const files = fs.readdirSync(dir);
+    function writeTree(dir, depth = 0) {
+        const files = fs.readdirSync(dir).filter(f => !excludedFolders.includes(f));
+        files.sort();
 
         for (const file of files) {
             const filePath = path.join(dir, file);
@@ -48,11 +49,14 @@ function writeStructureAndFiles() {
 
     outputLines.push("\n# 📄 Ключевые файлы и их содержимое\n");
 
-    walkDir(projectRoot, (filePath) => {
-        const relPath = path.relative(projectRoot, filePath);
-        const content = fs.readFileSync(filePath, "utf-8");
-        outputLines.push(`\n\n===== 📁 ${relPath} =====\n`);
-        outputLines.push(content);
+    walkDirAll(projectRoot, (filePath) => {
+        const ext = path.extname(filePath);
+        if (codeExtensions.includes(ext)) {
+            const relPath = path.relative(projectRoot, filePath);
+            const content = fs.readFileSync(filePath, "utf-8");
+            outputLines.push(`\n\n===== 📁 ${relPath} =====\n`);
+            outputLines.push(content);
+        }
     });
 
     fs.writeFileSync(outputFile, outputLines.join("\n"), "utf-8");

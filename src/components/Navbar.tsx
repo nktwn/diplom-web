@@ -1,30 +1,31 @@
-// src/components/Navbar.tsx
+'use client';
 
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 
 export default function Navbar() {
-    const { user, logout } = useAuth();
+    const { user } = useAuth();
 
     return (
-        <nav className="bg-blue-600 text-white p-4 flex justify-between">
+        <nav className="bg-blue-600 text-white p-4 flex justify-between items-center">
+            {/* Left — Filters & Sort (stubs) */}
             <div className="space-x-4">
-                <Link href="/">Главная</Link>
-                <Link href="/cart">Корзина</Link>
-                <Link href="/orders">Заказы</Link>
+                <button className="hover:underline">Filters</button>
+                <button className="hover:underline">Sort</button>
             </div>
+
+            {/* Center — Main navigation */}
+            <div className="space-x-4 text-lg font-medium">
+                <Link href="/">Catalogue</Link>
+                <Link href="/cart">Cart</Link>
+            </div>
+
+            {/* Right — Auth */}
             <div>
                 {user ? (
-                    <>
-                        <span className="mr-4">{user.name}</span>
-                        <button onClick={logout}>Выйти</button>
-                    </>
+                    <Link href="/profile" className="hover:underline">Profile</Link>
                 ) : (
-                    <>
-                        <Link href="/login">Войти</Link>
-                        <span className="mx-2">/</span>
-                        <Link href="/register">Регистрация</Link>
-                    </>
+                    <Link href="/login" className="hover:underline">Login</Link>
                 )}
             </div>
         </nav>

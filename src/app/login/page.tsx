@@ -1,23 +1,23 @@
 'use client';
 
 import { useState } from "react";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
     const { login } = useAuth();
     const router = useRouter();
 
-    const [form, setForm] = useState({ email: "", password: "" });
+    const [form, setForm] = useState({ phone_number: "", password: "" });
     const [error, setError] = useState("");
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            await login(form.email, form.password);
+            await login(form.phone_number, form.password);
             router.push("/");
         } catch (err) {
-            setError("Неверные данные");
+            setError("Неверный номер телефона или пароль");
         }
     };
 
@@ -26,10 +26,10 @@ export default function LoginPage() {
             <h1 className="text-2xl font-bold mb-4">Вход</h1>
             <form onSubmit={handleSubmit} className="space-y-4">
                 <input
-                    type="email"
-                    placeholder="Email"
-                    value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    type="tel"
+                    placeholder="Номер телефона"
+                    value={form.phone_number}
+                    onChange={(e) => setForm({ ...form, phone_number: e.target.value })}
                     className="w-full p-2 border rounded"
                 />
                 <input
@@ -40,10 +40,7 @@ export default function LoginPage() {
                     className="w-full p-2 border rounded"
                 />
                 {error && <p className="text-red-600">{error}</p>}
-                <button
-                    type="submit"
-                    className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700"
-                >
+                <button className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700">
                     Войти
                 </button>
             </form>

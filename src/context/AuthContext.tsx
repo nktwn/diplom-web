@@ -1,19 +1,14 @@
-// src/context/AuthContext.tsx
+'use client';
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useState } from "react";
 import api from "@/lib/axios";
-
-interface User {
-    id: number;
-    email: string;
-    name: string;
-}
+import { User } from "@/types";
 
 interface AuthContextType {
     user: User | null;
-    login: (email: string, password: string) => Promise<void>;
+    login: (phone: string, password: string) => Promise<void>;
     logout: () => Promise<void>;
-    register: (data: { email: string; password: string; name: string }) => Promise<void>;
+    register: (data: { name: string; phone_number: string; password: string; confirm_password: string }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -21,26 +16,19 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
 
-    useEffect(() => {
-        api.get("/auth/profile")
-            .then(res => setUser(res.data))
-            .catch(() => setUser(null));
-    }, []);
+    const login = async (phone_number: string, password: string) => {
+        const res = await api.post("/auth/login", { phone_number, password });
+        setUser(res.data); // предполагается, что backend возвращает юзера
+    };
 
-    const login = async (email: string, password: string) => {
-        await api.post("/auth/login", { email, password });
-        const res = await api.get("/auth/profile");
+    const register = async (data: { name: string; phone_number: string; password: string; confirm_password: string }) => {
+        const res = await api.post("/auth/register", data);
         setUser(res.data);
     };
 
     const logout = async () => {
-        await api.post("/auth/logout");
+        // Просто сбрасываем состояние юзера — без API-запроса
         setUser(null);
-    };
-
-    const register = async (data: { email: string; password: string; name: string }) => {
-        await api.post("/auth/register", data);
-        await login(data.email, data.password);
     };
 
     return (
