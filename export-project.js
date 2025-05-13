@@ -4,7 +4,7 @@ const path = require("path");
 const projectRoot = path.resolve(__dirname); // корневая папка проекта
 const outputFile = path.resolve(__dirname, "project-export.txt");
 
-const codeExtensions = [".ts", ".tsx", ".json", ".mjs"];
+const codeExtensions = [".ts", ".tsx", ".mjs", ".css"];
 const excludedFolders = ["node_modules", ".next", ".idea", "public", ".git", ".gitignore", "README.md"];
 
 function walkDirAll(dir, callback) {
