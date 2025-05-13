@@ -19,7 +19,6 @@ export interface Product {
     };
 }
 
-
 export interface CartItem {
     productId: number;
     supplierId: number;
