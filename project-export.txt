@@ -36,6 +36,7 @@ src/
 │  │  ├─ SupplierSelector.tsx
 │  ├─ context/
 │  │  ├─ AuthContext.tsx
+│  │  ├─ CartContext.tsx
 │  ├─ hooks/
 │  │  ├─ useAuth.ts
 │  ├─ lib/
@@ -105,6 +106,67 @@ export default config;
 
 ===== 📁 src/app/cart/page.tsx =====
 
+'use client';
+
+import { useCart } from "@/context/CartContext";
+import { useEffect, useState } from "react";
+import api from "@/lib/axios";
+import { Product } from "@/types";
+
+export default function CartPage() {
+    const { cart, checkout, clearCart } = useCart();
+    const [products, setProducts] = useState<Record<number, Product>>({});
+
+    useEffect(() => {
+        const loadProducts = async () => {
+            const ids = [...new Set(cart.map((c) => c.productId))];
+            const responses = await Promise.all(
+                ids.map((id) => api.get(`/product/${id}`))
+            );
+            const map: Record<number, Product> = {};
+            responses.forEach((r) => {
+                map[r.data.product.product.id] = r.data.product.product;
+            });
+            setProducts(map);
+        };
+        if (cart.length > 0) loadProducts();
+    }, [cart]);
+
+    const handleCheckout = async () => {
+        try {
+            await checkout();
+            alert("Заказ оформлен!");
+        } catch {
+            alert("Ошибка при оформлении заказа");
+        }
+    };
+
+    if (cart.length === 0) return <p className="text-center mt-20">Корзина пуста</p>;
+
+    return (
+        <div className="max-w-3xl mx-auto space-y-6">
+            <h1 className="text-2xl font-bold">Корзина</h1>
+            {cart.map((item, index) => {
+                const product = products[item.productId];
+                return (
+                    <div key={index} className="flex justify-between items-center border-b py-2">
+                        <div>
+                            <p>{product?.name ?? "Загрузка..."}</p>
+                            <p className="text-sm text-gray-500">Поставщик ID: {item.supplierId}</p>
+                        </div>
+                        <p>{item.quantity} шт</p>
+                    </div>
+                );
+            })}
+            <div className="flex justify-between mt-6">
+                <button onClick={clearCart} className="text-red-600">Очистить</button>
+                <button onClick={handleCheckout} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+                    Оформить заказ
+                </button>
+            </div>
+        </div>
+    );
+}
 
 
 
@@ -141,6 +203,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import Navbar from "@/components/Navbar";
+import { CartProvider } from "@/context/CartContext";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -155,9 +218,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <html lang="ru">
         <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <AuthProvider>
-            <Navbar />
-            <main className="px-4 sm:px-6 lg:px-12 py-6 bg-[var(--background)] text-[var(--foreground)] min-h-screen">
-                {children}</main>
+            <CartProvider>
+                <Navbar />
+                <main className="px-4 sm:px-6 lg:px-12 py-6 bg-[var(--background)] text-[var(--foreground)] min-h-screen">
+                    {children}</main>
+            </CartProvider>
         </AuthProvider>
         </body>
         </html>
@@ -360,6 +425,113 @@ export default function HomePage() {
 
 ===== 📁 src/app/product/[id]/page.tsx =====
 
+'use client';
+
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import Link from "next/link";
+import api from "@/lib/axios";
+import { Product, Supplier } from "@/types";
+import { useCart } from "@/context/CartContext";
+
+interface SupplierOffer {
+    price: number;
+    sell_amount: number;
+    supplier: Supplier;
+}
+
+interface ApiResponse {
+    product: {
+        product: Product;
+        suppliers: SupplierOffer[];
+    };
+}
+
+export default function ProductPage() {
+    const { id } = useParams<{ id: string }>();
+    const [product, setProduct] = useState<Product | null>(null);
+    const [suppliers, setSuppliers] = useState<SupplierOffer[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+    const { addToCart } = useCart();
+
+    useEffect(() => {
+        const fetchProduct = async () => {
+            try {
+                const res = await api.get<ApiResponse>(`/product/${id}`);
+                setProduct(res.data.product.product);
+                setSuppliers(res.data.product.suppliers);
+            } catch (err) {
+                console.error("Ошибка загрузки продукта:", err);
+                setError("Не удалось загрузить продукт");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (id) fetchProduct();
+    }, [id]);
+
+    if (loading) return <p>Загрузка...</p>;
+    if (error) return <p className="text-red-600">{error}</p>;
+    if (!product) return <p>Продукт не найден</p>;
+
+    return (
+        <div className="max-w-3xl mx-auto space-y-6">
+            <Link href="/" className="text-blue-600 hover:underline">← Назад</Link>
+
+            <div className="flex flex-col sm:flex-row gap-6">
+                <img
+                    src={product.ImageUrl}
+                    alt={product.name}
+                    className="w-full sm:w-64 h-64 object-cover border rounded-lg"
+                />
+                <div className="flex-1">
+                    <h1 className="text-2xl font-bold">{product.name}</h1>
+                    <p className="text-gray-600 mt-2">
+                        от {product.lowest_product_supplier?.price ?? "N/A"}₽
+                    </p>
+                </div>
+            </div>
+
+            <div>
+                <h2 className="text-lg font-semibold mt-6 mb-2">Поставщики:</h2>
+                {suppliers.length === 0 ? (
+                    <p className="text-gray-500">Нет доступных поставщиков.</p>
+                ) : (
+                    <ul className="space-y-3">
+                        {suppliers.map((offer, index) => (
+                            <li
+                                key={index}
+                                className="border p-4 rounded bg-[var(--card-bg)] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
+                            >
+                                <div>
+                                    <p className="font-medium">{offer.supplier.name}</p>
+                                    <p className="text-sm text-gray-600">В наличии: {offer.sell_amount}</p>
+                                </div>
+                                <div className="flex flex-col items-end gap-2">
+                                    <p className="text-lg font-semibold text-[var(--primary)]">{offer.price}₽</p>
+                                    <button
+                                        onClick={() =>
+                                            addToCart({
+                                                productId: product.id,
+                                                supplierId: offer.supplier.id,
+                                                quantity: 1,
+                                            })
+                                        }
+                                        className="bg-[var(--primary)] text-white text-sm px-4 py-1.5 rounded hover:bg-[var(--primary-hover)] transition"
+                                    >
+                                        В корзину
+                                    </button>
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </div>
+        </div>
+    );
+}
 
 
 
@@ -490,7 +662,7 @@ export default function Navbar() {
 
 ===== 📁 src/components/ProductCard.tsx =====
 
-// components/ProductCard.tsx
+import Link from "next/link";
 import { Product } from "@/types";
 
 interface ProductCardProps {
@@ -501,20 +673,22 @@ export default function ProductCard({ product }: ProductCardProps) {
     const minPrice = product.lowest_product_supplier?.price ?? 0;
 
     return (
-        <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl shadow-sm overflow-hidden transform transition duration-300 hover:scale-[1.03] hover:shadow-md">
-            <img
-                src={product.ImageUrl}
-                alt={product.name}
-                className="w-full h-40 object-cover"
-            />
-            <div className="p-3">
-                <h3 className="text-md font-semibold text-[var(--foreground)]">{product.name}</h3>
-                <p className="text-sm text-gray-500 mt-1">от {minPrice}₽</p>
-                <button className="mt-3 w-full bg-[var(--primary)] text-white text-sm py-1.5 rounded hover:bg-[var(--primary-hover)] transition duration-300">
-                    Добавить в корзину
-                </button>
+        <Link href={`/product/${product.id}`}>
+            <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl shadow-sm overflow-hidden transform transition duration-300 hover:scale-[1.03] hover:shadow-md cursor-pointer">
+                <img
+                    src={product.ImageUrl}
+                    alt={product.name}
+                    className="w-full h-40 object-cover"
+                />
+                <div className="p-3">
+                    <h3 className="text-md font-semibold text-[var(--foreground)]">{product.name}</h3>
+                    <p className="text-sm text-gray-500 mt-1">от {minPrice}₽</p>
+                    <button className="mt-3 w-full bg-[var(--primary)] text-white text-sm py-1.5 rounded hover:bg-[var(--primary-hover)] transition duration-300">
+                        Подробнее
+                    </button>
+                </div>
             </div>
-        </div>
+        </Link>
     );
 }
 
@@ -547,8 +721,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const login = async (phone_number: string, password: string) => {
         const res = await api.post("/auth/login", { phone_number, password });
-        setUser(res.data); // предполагается, что backend возвращает юзера
+
+        // ✅ Сохраняем токены
+        localStorage.setItem("access_token", res.data.access_token);
+        localStorage.setItem("refresh_token", res.data.refresh_token);
+
+        // ❗ Пока нет /auth/me — можно установить временного пользователя
+        setUser({ id: 0, name: "Пользователь", email: "" });
     };
+
+
 
     const register = async (data: { name: string; phone_number: string; password: string; confirm_password: string }) => {
         const res = await api.post("/auth/register", data);
@@ -575,6 +757,72 @@ export const useAuth = () => {
 
 
 
+===== 📁 src/context/CartContext.tsx =====
+
+'use client';
+
+import { createContext, useContext, useState } from "react";
+import api from "@/lib/axios";
+import { CartItem } from "@/types";
+
+interface CartContextType {
+    cart: CartItem[];
+    addToCart: (item: CartItem) => Promise<void>;
+    clearCart: () => void;
+    checkout: () => Promise<void>;
+}
+
+const CartContext = createContext<CartContextType | undefined>(undefined);
+
+export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const [cart, setCart] = useState<CartItem[]>([]);
+
+    const addToCart = async (item: CartItem) => {
+        await api.post("/cart/add", {
+            product_id: item.productId,
+            supplier_id: item.supplierId,
+            quantity: item.quantity,
+        });
+
+        setCart((prev) => {
+            const exists = prev.find(
+                (p) => p.productId === item.productId && p.supplierId === item.supplierId
+            );
+            if (exists) {
+                return prev.map((p) =>
+                    p.productId === item.productId && p.supplierId === item.supplierId
+                        ? { ...p, quantity: p.quantity + item.quantity }
+                        : p
+                );
+            }
+            return [...prev, item];
+        });
+    };
+
+    const clearCart = () => {
+        setCart([]);
+    };
+
+    const checkout = async () => {
+        await api.post("/cart/checkout");
+        clearCart();
+    };
+
+    return (
+        <CartContext.Provider value={{ cart, addToCart, clearCart, checkout }}>
+            {children}
+        </CartContext.Provider>
+    );
+};
+
+export const useCart = () => {
+    const context = useContext(CartContext);
+    if (!context) throw new Error("useCart must be used within CartProvider");
+    return context;
+};
+
+
+
 ===== 📁 src/hooks/useAuth.ts =====
 
 export { useAuth } from "@/context/AuthContext";
@@ -586,12 +834,19 @@ export { useAuth } from "@/context/AuthContext";
 import axios from "axios";
 
 const api = axios.create({
-    baseURL: "http://localhost:8080/api", // ✅ правильный порт
-    withCredentials: true,
+    baseURL: "http://localhost:8080/api",
+    withCredentials: false, // отключаем cookie
+});
+
+api.interceptors.request.use((config) => {
+    const token = localStorage.getItem("access_token");
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
 });
 
 export default api;
-
 
 
 
@@ -617,7 +872,6 @@ export interface Product {
         supplier: Supplier;
     };
 }
-
 
 export interface CartItem {
     productId: number;

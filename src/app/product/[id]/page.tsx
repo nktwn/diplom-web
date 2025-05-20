@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import api from "@/lib/axios";
 import { Product, Supplier } from "@/types";
-import Link from "next/link";
+import { useCart } from "@/context/CartContext";
 
 interface SupplierOffer {
     price: number;
@@ -25,6 +26,7 @@ export default function ProductPage() {
     const [suppliers, setSuppliers] = useState<SupplierOffer[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const { addToCart } = useCart();
 
     useEffect(() => {
         const fetchProduct = async () => {
@@ -50,6 +52,7 @@ export default function ProductPage() {
     return (
         <div className="max-w-3xl mx-auto space-y-6">
             <Link href="/" className="text-blue-600 hover:underline">← Назад</Link>
+
             <div className="flex flex-col sm:flex-row gap-6">
                 <img
                     src={product.ImageUrl}
@@ -69,22 +72,30 @@ export default function ProductPage() {
                 {suppliers.length === 0 ? (
                     <p className="text-gray-500">Нет доступных поставщиков.</p>
                 ) : (
-                    <ul className="space-y-2">
+                    <ul className="space-y-3">
                         {suppliers.map((offer, index) => (
                             <li
                                 key={index}
-                                className="border p-3 rounded bg-[var(--card-bg)] flex flex-col sm:flex-row justify-between items-start sm:items-center"
+                                className="border p-4 rounded bg-[var(--card-bg)] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
                             >
                                 <div>
                                     <p className="font-medium">{offer.supplier.name}</p>
-                                    <p className="text-sm text-gray-600">
-                                        В наличии: {offer.sell_amount}
-                                    </p>
+                                    <p className="text-sm text-gray-600">В наличии: {offer.sell_amount}</p>
                                 </div>
-                                <div className="mt-2 sm:mt-0">
-                                    <p className="text-right text-lg font-semibold text-[var(--primary)]">
-                                        {offer.price}₽
-                                    </p>
+                                <div className="flex flex-col items-end gap-2">
+                                    <p className="text-lg font-semibold text-[var(--primary)]">{offer.price}₽</p>
+                                    <button
+                                        onClick={() =>
+                                            addToCart({
+                                                productId: product.id,
+                                                supplierId: offer.supplier.id,
+                                                quantity: 1,
+                                            })
+                                        }
+                                        className="bg-[var(--primary)] text-white text-sm px-4 py-1.5 rounded hover:bg-[var(--primary-hover)] transition"
+                                    >
+                                        В корзину
+                                    </button>
                                 </div>
                             </li>
                         ))}

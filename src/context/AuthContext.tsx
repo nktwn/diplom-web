@@ -18,8 +18,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const login = async (phone_number: string, password: string) => {
         const res = await api.post("/auth/login", { phone_number, password });
-        setUser(res.data); // предполагается, что backend возвращает юзера
+
+        // ✅ Сохраняем токены
+        localStorage.setItem("access_token", res.data.access_token);
+        localStorage.setItem("refresh_token", res.data.refresh_token);
+
+        // ❗ Пока нет /auth/me — можно установить временного пользователя
+        setUser({ id: 0, name: "Пользователь", email: "" });
     };
+
+
 
     const register = async (data: { name: string; phone_number: string; password: string; confirm_password: string }) => {
         const res = await api.post("/auth/register", data);
