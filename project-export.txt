@@ -1,5 +1,6 @@
 # 📁 Структура проекта
 
+.DS_Store
 eslint.config.mjs
 export-project.js
 next-env.d.ts
@@ -11,6 +12,8 @@ project-export.txt
 src/
 │  ├─ app/
 │  │  ├─ cart/
+│  │  │  ├─ page.tsx
+│  │  ├─ catalog/
 │  │  │  ├─ page.tsx
 │  │  ├─ checkout/
 │  │  │  ├─ page.tsx
@@ -31,6 +34,7 @@ src/
 │  │  ├─ register/
 │  │  │  ├─ page.tsx
 │  ├─ components/
+│  │  ├─ Footer.tsx
 │  │  ├─ Navbar.tsx
 │  │  ├─ ProductCard.tsx
 │  │  ├─ SupplierSelector.tsx
@@ -170,6 +174,69 @@ export default function CartPage() {
 
 
 
+===== 📁 src/app/catalog/page.tsx =====
+
+// src/app/catalog/page.tsx
+'use client';
+
+import { useEffect, useState } from "react";
+import api from "@/lib/axios";
+import { Product } from "@/types";
+import ProductCard from "@/components/ProductCard";
+
+const LIMIT = 20;
+
+export default function CatalogPage() {
+    const [products, setProducts] = useState<Product[]>([]);
+    const [page, setPage] = useState(0);
+
+    useEffect(() => {
+        const fetchProducts = async () => {
+            try {
+                const res = await api.get("/product/list", {
+                    params: {
+                        limit: LIMIT,
+                        offset: page * LIMIT,
+                    },
+                });
+                setProducts(res.data.product_list);
+            } catch (e) {
+                console.error("Не удалось загрузить продукты:", e);
+            }
+        };
+
+        fetchProducts();
+    }, [page]);
+
+    return (
+        <div className="space-y-8">
+            <h1 className="text-2xl font-bold">Каталог</h1>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-6">
+                {products.map((product) => (
+                    <ProductCard key={product.id} product={product} />
+                ))}
+            </div>
+            <div className="flex justify-center gap-2 mt-8">
+                <button
+                    disabled={page === 0}
+                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                    className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+                >
+                    Назад
+                </button>
+                <button
+                    onClick={() => setPage((p) => p + 1)}
+                    className="px-3 py-1 bg-gray-200 rounded"
+                >
+                    Вперед
+                </button>
+            </div>
+        </div>
+    );
+}
+
+
+
 ===== 📁 src/app/checkout/page.tsx =====
 
 
@@ -180,18 +247,19 @@ export default function CartPage() {
 @import "tailwindcss";
 
 :root {
-  --background: #fdf6ee;
-  --foreground: #3e2f20;
-  --primary: #d87d4a;
-  --primary-hover: #a34f20;
-  --card-bg: #fff7ed;
-  --card-border: #f1e8dd;
+  --background: #f9fafb;
+  --foreground: #111827;
+  --primary: #14b8a6;
+  --primary-hover: #0d9488;
+  --card-bg: #ffffff;
+  --card-border: #e5e7eb;
+  --navbar-bg: rgba(255, 255, 255, 0.8);
 }
 
 body {
   background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Inter', sans-serif;
 }
 
 
@@ -204,6 +272,7 @@ import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import Navbar from "@/components/Navbar";
 import { CartProvider } from "@/context/CartContext";
+import Footer from "@/components/Footer";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -215,19 +284,24 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
     return (
-        <html lang="ru">
-        <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <html lang="ru" className="overflow-x-hidden">
+        <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[var(--background)] text-[var(--foreground)] overflow-x-hidden`}>
         <AuthProvider>
             <CartProvider>
                 <Navbar />
-                <main className="px-4 sm:px-6 lg:px-12 py-6 bg-[var(--background)] text-[var(--foreground)] min-h-screen">
-                    {children}</main>
+                <main className="pt-24 px-4 sm:px-6 lg:px-12 py-6 min-h-screen">
+                    {children}
+                </main>
+
+                <Footer />
             </CartProvider>
         </AuthProvider>
         </body>
         </html>
     );
 }
+
+
 
 
 
@@ -308,115 +382,153 @@ export default function NotFound() {
 'use client';
 
 import { useEffect, useState } from "react";
-import api from "@/lib/axios";
-import { Product } from "@/types";
 import ProductCard from "@/components/ProductCard";
+import api from "@/lib/axios";
+import Link from "next/link";
+import { Product } from "@/types";
 
-const LIMIT = 28;
+const BANNER_IMAGES = ["/banner/img1.png", "/banner/img2.png", "/banner/img3.png", "/banner/img4.png"];
 
 export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [page, setPage] = useState(0);
-
-  const totalPages = Math.ceil(total / LIMIT);
+  const [topProducts, setTopProducts] = useState<Product[]>([]);
+  const [catalogPage, setCatalogPage] = useState(0);
+  const [prevPage, setPrevPage] = useState<number | null>(null);
+  const [bannerIndex, setBannerIndex] = useState(0);
+  const [prevBannerIndex, setPrevBannerIndex] = useState<number | null>(null);
 
   useEffect(() => {
-    const fetchProducts = async () => {
-      setLoading(true);
-      setError("");
+    const fetch = async () => {
       try {
-        const res = await api.get("/product/list", {
-          params: {
-            limit: LIMIT,
-            offset: page * LIMIT,
-          },
-        });
-        setProducts(res.data.product_list);
-        setTotal(res.data.total); // Предполагается, что сервер возвращает общее количество продуктов
+        const res = await api.get("/product/list?limit=50&offset=0");
+        const productList: Product[] = res.data.product_list;
+        setProducts(productList);
+        setTopProducts(productList.sort(() => 0.5 - Math.random()).slice(0, 5));
       } catch (e) {
-        console.error("❌ Failed to load products:", e);
-        setError("Не удалось загрузить продукты");
-      } finally {
-        setLoading(false);
+        console.error("Ошибка загрузки продуктов:", e);
       }
     };
+    fetch();
+  }, []);
 
-    fetchProducts();
-  }, [page]);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPrevBannerIndex(bannerIndex);
+      setBannerIndex((prev) => (prev + 1) % BANNER_IMAGES.length);
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [bannerIndex]);
 
-  const getVisiblePages = () => {
-    const delta = 2;
-    const pages: (number | string)[] = [];
-
-    const left = Math.max(0, page - delta);
-    const right = Math.min(totalPages - 1, page + delta);
-
-    if (left > 0) {
-      pages.push(0);
-      if (left > 1) pages.push("...");
-    }
-
-    for (let i = left; i <= right; i++) {
-      pages.push(i);
-    }
-
-    if (right < totalPages - 1) {
-      if (right < totalPages - 2) pages.push("...");
-      pages.push(totalPages - 1);
-    }
-
-    return pages;
-  };
-
-  if (loading) return <p>Загрузка...</p>;
-  if (error) return <p className="text-red-600">{error}</p>;
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPrevPage(catalogPage);
+      setCatalogPage((prev) => (prev + 1) % 5);
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [catalogPage]);
 
   return (
-      <div className="space-y-8">
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-6 mt-4">
-        {products.map((product) => (
-              <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
+      <div className="space-y-10 w-[90%] mx-auto px-4 py-8">
+        {/* БАННЕР */}
+        <section className="relative overflow-hidden rounded-xl border shadow bg-[var(--card-bg)] w-full h-[400px]">
+          <div className="relative h-full overflow-hidden">
+            {BANNER_IMAGES.map((img, idx) => {
+              const baseStyle = "absolute inset-0 w-full h-full transition-all duration-[1000ms] ease-in-out";
 
-        <div className="flex justify-center gap-2 mt-8 flex-wrap">
-          <button
-              disabled={page === 0}
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-              className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
-          >
-            Назад
-          </button>
+              const isCurrent = idx === bannerIndex;
+              const isPrev = idx === prevBannerIndex;
 
-          {getVisiblePages().map((p, index) =>
-              p === "..." ? (
-                  <span key={`ellipsis-${index}`} className="px-2 py-1">
-              ...
-            </span>
-              ) : (
-                  <button
-                      key={p}
-                      onClick={() => setPage(Number(p))}
-                      className={`px-3 py-1 rounded ${
-                          p === page ? "bg-blue-500 text-white" : "bg-gray-200"
-                      }`}
+              return (
+                  <div
+                      key={idx}
+                      className={`${baseStyle} ${isCurrent ? "translate-x-0 opacity-100 z-10" : isPrev ? "-translate-x-full opacity-0 z-0" : "translate-x-full opacity-0 z-0"}`}
                   >
-                    {Number(p) + 1}
-                  </button>
-              )
-          )}
+                    {/* Фоновая размытка */}
+                    <img
+                        src={img}
+                        alt=""
+                        className="absolute inset-0 w-full h-full object-cover blur-lg scale-110 opacity-40"
+                    />
+                    {/* Основное изображение */}
+                    <div className="relative z-10 w-full h-full flex justify-center items-center">
+                      <img
+                          src={img}
+                          alt={`Banner ${idx}`}
+                          className="max-w-[70%] max-h-[80%] object-contain"
+                      />
+                    </div>
+                  </div>
+              );
+            })}
+          </div>
 
-          <button
-              disabled={page >= totalPages - 1}
-              onClick={() => setPage((p) => p + 1)}
-              className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
-          >
-            Вперед
-          </button>
-        </div>
+          <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 flex gap-2">
+            {BANNER_IMAGES.map((_, idx) => (
+                <span
+                    key={idx}
+                    className={`w-2 h-2 rounded-full ${
+                        idx === bannerIndex ? "bg-[var(--primary)]" : "bg-gray-400"
+                    } transition`}
+                />
+            ))}
+          </div>
+        </section>
+
+
+        {/* ТОП-ПРОДАЖ */}
+        <section className="rounded-xl border shadow p-4 bg-gradient-to-br from-[var(--primary)]/10 to-white w-full">
+          <h2 className="text-2xl font-bold mb-4 text-[var(--foreground)]">🔥 Топ-продаж</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+            {topProducts.map((product) => (
+                <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        </section>
+
+        {/* КАТАЛОГ */}
+        <section className="rounded-xl border shadow p-4 bg-[var(--card-bg)] w-full">
+          <h2 className="text-2xl font-bold mb-4 text-[var(--foreground)]">🛍️ Каталог</h2>
+          <div className="relative h-[750px] overflow-hidden">
+            {[...Array(5)].map((_, idx) => {
+              let className = "absolute inset-0 transition-all duration-[1000ms] ease-in-out";
+              if (idx === catalogPage) {
+                className += " translate-x-0 opacity-100 z-10";
+              } else if (idx === prevPage) {
+                className += " -translate-x-full opacity-0 z-0";
+              } else {
+                className += " translate-x-full opacity-0 z-0";
+              }
+
+              return (
+                  <div key={idx} className={className}>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+                      {products.slice(idx * 10, idx * 10 + 10).map((product) => (
+                          <ProductCard key={product.id} product={product} />
+                      ))}
+                    </div>
+                  </div>
+              );
+            })}
+          </div>
+          <div className="flex justify-center mt-4 gap-2">
+            {[...Array(5)].map((_, idx) => (
+                <span
+                    key={idx}
+                    className={`w-2 h-2 rounded-full ${
+                        idx === catalogPage ? "bg-blue-600" : "bg-gray-300"
+                    } transition`}
+                />
+            ))}
+          </div>
+          <div className="text-center mt-6">
+            <Link
+                href="/catalog"
+                className="inline-block text-[var(--primary)] text-base font-semibold border border-[var(--primary)] px-5 py-2 rounded hover:bg-[var(--primary)] hover:text-white transition"
+            >
+              Смотреть весь каталог →
+            </Link>
+          </div>
+        </section>
       </div>
   );
 }
@@ -626,6 +738,40 @@ export default function RegisterPage() {
 
 
 
+===== 📁 src/components/Footer.tsx =====
+
+// src/components/Footer.tsx
+import Image from "next/image";
+
+export default function Footer() {
+    return (
+        <footer className="bg-gradient-to-br from-[var(--primary)]/10 to-[var(--card-bg)] border-t border-[var(--card-border)] mt-20 px-6 py-12">
+            <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start gap-12">
+
+                <div className="flex-1 space-y-4 text-sm text-[var(--foreground)]">
+                    <h3 className="text-xl font-semibold">Zhan.Store</h3>
+                    <p>📍 <strong>г. Астана</strong></p>
+                    <p>📦 ООО "Zhan.Store"</p>
+                    <p>Осуществляет деятельность в сфере электронной коммерции и дистрибуции товаров по Республике Казахстан.</p>
+                    <p>📞 Телефон: <a href="tel:+77471713773" className="text-[var(--primary)] hover:underline">+7 747 171 3773</a></p>
+                </div>
+                <h3 className="text-xl font-semibold">Сканируйте для связи с поддержкой</h3>
+                <div className="flex-shrink-0 text-center md:text-right">
+                    <Image
+                        src="/qr.png"
+                        alt="QR для поддержки"
+                        width={150}
+                        height={150}
+                        className="mx-auto md:ml-auto border border-[var(--card-border)] rounded-lg shadow-md"
+                    />
+                </div>
+            </div>
+        </footer>
+    );
+}
+
+
+
 ===== 📁 src/components/Navbar.tsx =====
 
 'use client';
@@ -637,21 +783,19 @@ export default function Navbar() {
     const { user } = useAuth();
 
     return (
-        <nav className="bg-[var(--card-bg)] text-[var(--foreground)] p-4 flex justify-between items-center border-b border-[var(--card-border)]">
-            <div className="space-x-4">
-                <button className="hover:text-[var(--primary)]">Filters</button>
-                <button className="hover:text-[var(--primary)]">Sort</button>
-            </div>
-            <div className="space-x-4 text-lg font-medium">
-                <Link href="/" className="hover:text-[var(--primary)]">Catalogue</Link>
-                <Link href="/cart" className="hover:text-[var(--primary)]">Cart</Link>
-            </div>
-            <div>
-                {user ? (
-                    <Link href="/profile" className="hover:text-[var(--primary)]">Profile</Link>
-                ) : (
-                    <Link href="/login" className="hover:text-[var(--primary)]">Login</Link>
-                )}
+        <nav className="fixed top-0 left-0 w-full z-50 backdrop-blur-md bg-[var(--navbar-bg)] border-b border-[var(--card-border)] shadow-sm">
+            <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+                <Link href="/" className="text-2xl font-extrabold text-[var(--primary)] hover:underline">
+                    Zhan.Store
+                </Link>
+                <div className="space-x-6 text-lg font-medium text-[var(--foreground)]">
+                    <Link href="/cart" className="hover:text-[var(--primary)]">Корзина</Link>
+                    {user ? (
+                        <Link href="/profile" className="hover:text-[var(--primary)]">Профиль</Link>
+                    ) : (
+                        <Link href="/login" className="hover:text-[var(--primary)]">Войти</Link>
+                    )}
+                </div>
             </div>
         </nav>
 
@@ -674,15 +818,20 @@ export default function ProductCard({ product }: ProductCardProps) {
 
     return (
         <Link href={`/product/${product.id}`}>
-            <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl shadow-sm overflow-hidden transform transition duration-300 hover:scale-[1.03] hover:shadow-md cursor-pointer">
-                <img
-                    src={product.ImageUrl}
-                    alt={product.name}
-                    className="w-full h-40 object-cover"
-                />
-                <div className="p-3">
-                    <h3 className="text-md font-semibold text-[var(--foreground)]">{product.name}</h3>
-                    <p className="text-sm text-gray-500 mt-1">от {minPrice}₽</p>
+            <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl shadow hover:shadow-md transition-transform transform hover:-translate-y-1 cursor-pointer flex flex-col h-[340px] w-full">
+                <div className="w-full h-40 flex items-center justify-center bg-white">
+                    <img
+                        src={product.ImageUrl}
+                        alt={product.name}
+                        className="max-h-full max-w-full object-contain"
+                    />
+                </div>
+
+                <div className="p-3 flex flex-col justify-between flex-grow overflow-hidden">
+                    <h3 className="text-md font-semibold text-[var(--foreground)] line-clamp-2 h-[3.2em]">
+                        {product.name}
+                    </h3>
+                    <p className="text-sm text-gray-500 mt-1">от {minPrice.toLocaleString()} ₸</p>
                     <button className="mt-3 w-full bg-[var(--primary)] text-white text-sm py-1.5 rounded hover:bg-[var(--primary-hover)] transition duration-300">
                         Подробнее
                     </button>
