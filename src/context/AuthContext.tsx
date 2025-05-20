@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
 import api from "@/lib/axios";
 import { User } from "@/types";
 
@@ -16,27 +16,53 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
 
+    // Проверка при монтировании
+    useEffect(() => {
+        const token = localStorage.getItem("access_token");
+        const expiresAt = localStorage.getItem("expires_at");
+
+        if (token && expiresAt) {
+            const now = Date.now();
+            if (now < parseInt(expiresAt)) {
+                // Здесь ты можешь заменить на реальный вызов /auth/me
+                setUser({ id: 0, name: "Пользователь", email: "" });
+            } else {
+                localStorage.removeItem("access_token");
+                localStorage.removeItem("refresh_token");
+                localStorage.removeItem("expires_at");
+                setUser(null);
+            }
+        }
+    }, []);
+
     const login = async (phone_number: string, password: string) => {
         const res = await api.post("/auth/login", { phone_number, password });
 
-        // ✅ Сохраняем токены
+        const expiresAt = Date.now() + 6 * 60 * 60 * 1000; // 6 часов
+
         localStorage.setItem("access_token", res.data.access_token);
         localStorage.setItem("refresh_token", res.data.refresh_token);
+        localStorage.setItem("expires_at", expiresAt.toString());
 
-        // ❗ Пока нет /auth/me — можно установить временного пользователя
+        // Пока нет /auth/me — подставим временного пользователя
         setUser({ id: 0, name: "Пользователь", email: "" });
     };
 
-
-
     const register = async (data: { name: string; phone_number: string; password: string; confirm_password: string }) => {
         const res = await api.post("/auth/register", data);
-        setUser(res.data);
+        // Можно сразу залогинить:
+        const expiresAt = Date.now() + 6 * 60 * 60 * 1000;
+        localStorage.setItem("access_token", res.data.access_token);
+        localStorage.setItem("refresh_token", res.data.refresh_token);
+        localStorage.setItem("expires_at", expiresAt.toString());
+        setUser({ id: 0, name: "Пользователь", email: "" });
     };
 
     const logout = async () => {
-        // Просто сбрасываем состояние юзера — без API-запроса
         setUser(null);
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+        localStorage.removeItem("expires_at");
     };
 
     return (
