@@ -1,8 +1,10 @@
+// src/lib/axios.ts
+
 import axios from "axios";
 
 const api = axios.create({
-    baseURL: "http://localhost:8080/api",
-    withCredentials: false, // отключаем cookie
+    baseURL: "http://188.227.35.6:8080/api",
+    withCredentials: false,
 });
 
 api.interceptors.request.use((config) => {

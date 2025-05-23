@@ -312,6 +312,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function LoginPage() {
     const { login } = useAuth();
@@ -331,28 +332,37 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="max-w-md mx-auto">
-            <h1 className="text-2xl font-bold mb-4">Вход</h1>
-            <form onSubmit={handleSubmit} className="space-y-4">
-                <input
-                    type="tel"
-                    placeholder="Номер телефона"
-                    value={form.phone_number}
-                    onChange={(e) => setForm({ ...form, phone_number: e.target.value })}
-                    className="w-full p-2 border rounded"
-                />
-                <input
-                    type="password"
-                    placeholder="Пароль"
-                    value={form.password}
-                    onChange={(e) => setForm({ ...form, password: e.target.value })}
-                    className="w-full p-2 border rounded"
-                />
-                {error && <p className="text-red-600">{error}</p>}
-                <button className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700">
-                    Войти
-                </button>
-            </form>
+        <div className="px-4 pt-28 pb-20 flex justify-center">
+            <div className="w-full max-w-2xl border rounded-2xl shadow-xl bg-gradient-to-br from-[var(--primary)]/10 to-white p-10 space-y-8">
+                <h1 className="text-3xl font-bold text-center text-[var(--foreground)]">🔐 Вход в аккаунт</h1>
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    <input
+                        type="tel"
+                        placeholder="Номер телефона"
+                        value={form.phone_number}
+                        onChange={(e) => setForm({ ...form, phone_number: e.target.value })}
+                        className="w-full p-4 border rounded-lg text-lg"
+                    />
+                    <input
+                        type="password"
+                        placeholder="Пароль"
+                        value={form.password}
+                        onChange={(e) => setForm({ ...form, password: e.target.value })}
+                        className="w-full p-4 border rounded-lg text-lg"
+                    />
+                    {error && <p className="text-red-600 text-center">{error}</p>}
+                    <button className="w-full bg-blue-600 text-white py-3 text-lg rounded-lg hover:bg-blue-700 transition">
+                        Войти
+                    </button>
+                </form>
+
+                <p className="text-center text-gray-700 text-base">
+                    Ещё не зарегистрированы?{" "}
+                    <Link href="/register" className="text-[var(--primary)] hover:underline font-medium">
+                        Создать аккаунт →
+                    </Link>
+                </p>
+            </div>
         </div>
     );
 }
@@ -668,6 +678,7 @@ export default function ProfilePage() {
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function RegisterPage() {
     const { register } = useAuth();
@@ -696,42 +707,51 @@ export default function RegisterPage() {
     };
 
     return (
-        <div className="max-w-md mx-auto">
-            <h1 className="text-2xl font-bold mb-4">Регистрация</h1>
-            <form onSubmit={handleSubmit} className="space-y-4">
-                <input
-                    type="text"
-                    placeholder="Имя"
-                    value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    className="w-full p-2 border rounded"
-                />
-                <input
-                    type="tel"
-                    placeholder="Телефон"
-                    value={form.phone_number}
-                    onChange={(e) => setForm({ ...form, phone_number: e.target.value })}
-                    className="w-full p-2 border rounded"
-                />
-                <input
-                    type="password"
-                    placeholder="Пароль"
-                    value={form.password}
-                    onChange={(e) => setForm({ ...form, password: e.target.value })}
-                    className="w-full p-2 border rounded"
-                />
-                <input
-                    type="password"
-                    placeholder="Повторите пароль"
-                    value={form.confirm_password}
-                    onChange={(e) => setForm({ ...form, confirm_password: e.target.value })}
-                    className="w-full p-2 border rounded"
-                />
-                {error && <p className="text-red-600">{error}</p>}
-                <button className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700">
-                    Зарегистрироваться
-                </button>
-            </form>
+        <div className="px-4 pt-28 pb-20 flex justify-center">
+            <div className="w-full max-w-2xl border rounded-2xl shadow-xl bg-gradient-to-br from-[var(--primary)]/10 to-white p-10 space-y-8">
+                <h1 className="text-3xl font-bold text-center text-[var(--foreground)]">📝 Регистрация</h1>
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    <input
+                        type="text"
+                        placeholder="Имя"
+                        value={form.name}
+                        onChange={(e) => setForm({ ...form, name: e.target.value })}
+                        className="w-full p-4 border rounded-lg text-lg"
+                    />
+                    <input
+                        type="tel"
+                        placeholder="Телефон"
+                        value={form.phone_number}
+                        onChange={(e) => setForm({ ...form, phone_number: e.target.value })}
+                        className="w-full p-4 border rounded-lg text-lg"
+                    />
+                    <input
+                        type="password"
+                        placeholder="Пароль"
+                        value={form.password}
+                        onChange={(e) => setForm({ ...form, password: e.target.value })}
+                        className="w-full p-4 border rounded-lg text-lg"
+                    />
+                    <input
+                        type="password"
+                        placeholder="Повторите пароль"
+                        value={form.confirm_password}
+                        onChange={(e) => setForm({ ...form, confirm_password: e.target.value })}
+                        className="w-full p-4 border rounded-lg text-lg"
+                    />
+                    {error && <p className="text-red-600 text-center">{error}</p>}
+                    <button className="w-full bg-blue-600 text-white py-3 text-lg rounded-lg hover:bg-blue-700 transition">
+                        Зарегистрироваться
+                    </button>
+                </form>
+
+                <p className="text-center text-gray-700 text-base">
+                    Уже есть аккаунт?{" "}
+                    <Link href="/login" className="text-[var(--primary)] hover:underline font-medium">
+                        Войти →
+                    </Link>
+                </p>
+            </div>
         </div>
     );
 }
@@ -852,7 +872,7 @@ export default function ProductCard({ product }: ProductCardProps) {
 
 'use client';
 
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
 import api from "@/lib/axios";
 import { User } from "@/types";
 
@@ -868,27 +888,53 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
 
+    // Проверка при монтировании
+    useEffect(() => {
+        const token = localStorage.getItem("access_token");
+        const expiresAt = localStorage.getItem("expires_at");
+
+        if (token && expiresAt) {
+            const now = Date.now();
+            if (now < parseInt(expiresAt)) {
+                // Здесь ты можешь заменить на реальный вызов /auth/me
+                setUser({ id: 0, name: "Пользователь", email: "" });
+            } else {
+                localStorage.removeItem("access_token");
+                localStorage.removeItem("refresh_token");
+                localStorage.removeItem("expires_at");
+                setUser(null);
+            }
+        }
+    }, []);
+
     const login = async (phone_number: string, password: string) => {
         const res = await api.post("/auth/login", { phone_number, password });
 
-        // ✅ Сохраняем токены
+        const expiresAt = Date.now() + 6 * 60 * 60 * 1000; // 6 часов
+
         localStorage.setItem("access_token", res.data.access_token);
         localStorage.setItem("refresh_token", res.data.refresh_token);
+        localStorage.setItem("expires_at", expiresAt.toString());
 
-        // ❗ Пока нет /auth/me — можно установить временного пользователя
+        // Пока нет /auth/me — подставим временного пользователя
         setUser({ id: 0, name: "Пользователь", email: "" });
     };
 
-
-
     const register = async (data: { name: string; phone_number: string; password: string; confirm_password: string }) => {
         const res = await api.post("/auth/register", data);
-        setUser(res.data);
+        // Можно сразу залогинить:
+        const expiresAt = Date.now() + 6 * 60 * 60 * 1000;
+        localStorage.setItem("access_token", res.data.access_token);
+        localStorage.setItem("refresh_token", res.data.refresh_token);
+        localStorage.setItem("expires_at", expiresAt.toString());
+        setUser({ id: 0, name: "Пользователь", email: "" });
     };
 
     const logout = async () => {
-        // Просто сбрасываем состояние юзера — без API-запроса
         setUser(null);
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+        localStorage.removeItem("expires_at");
     };
 
     return (
@@ -980,11 +1026,13 @@ export { useAuth } from "@/context/AuthContext";
 
 ===== 📁 src/lib/axios.ts =====
 
+// src/lib/axios.ts
+
 import axios from "axios";
 
 const api = axios.create({
-    baseURL: "http://localhost:8080/api",
-    withCredentials: false, // отключаем cookie
+    baseURL: "http://188.227.35.6:8080/api", // ✅ изменено с localhost
+    withCredentials: false,
 });
 
 api.interceptors.request.use((config) => {

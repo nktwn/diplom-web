@@ -15,3 +15,17 @@ body {
   color: var(--foreground);
   font-family: 'Inter', sans-serif;
 }
+
+/* globals.css или components.css */
+
+.btn-primary {
+  @apply bg-[#14b8a6] text-white px-4 py-2 rounded shadow hover:bg-[#0d9488] transition text-sm;
+}
+
+.btn-outline-primary {
+  @apply text-[#14b8a6] border border-[#14b8a6] px-4 py-2 rounded shadow hover:bg-[#14b8a6]/10 transition text-sm;
+}
+
+.btn-danger {
+  @apply text-red-600 border border-red-600 px-4 py-2 rounded shadow hover:bg-red-50 transition text-sm;
+}
