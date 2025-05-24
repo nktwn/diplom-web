@@ -71,6 +71,30 @@ export default function CartPage() {
         }
     };
 
+    const changeQuantity = async (productId: number, supplierId: number, delta: number) => {
+        try {
+            if (delta > 0) {
+                await api.post("/cart/add", {
+                    product_id: productId,
+                    supplier_id: supplierId,
+                    quantity: delta,
+                });
+            } else if (delta < 0) {
+                await api.delete("/cart/delete", {
+                    params: {
+                        product_id: productId,
+                        supplier_id: supplierId,
+                        quantity: Math.abs(delta),
+                    },
+                });
+            }
+
+            await fetchCart();
+        } catch (e) {
+            console.error("Ошибка изменения количества товара:", e);
+        }
+    };
+
     useEffect(() => {
         fetchCart();
     }, []);
@@ -94,8 +118,7 @@ export default function CartPage() {
             <h1 className="text-3xl font-bold">🛒 Ваша корзина</h1>
 
             {cartData.suppliers.map((supplier) => {
-                const needsMoreForFreeDelivery =
-                    supplier.total_amount < supplier.free_delivery_amount;
+                const needsMoreForFreeDelivery = supplier.total_amount < supplier.free_delivery_amount;
                 const deliveryFee = needsMoreForFreeDelivery ? supplier.delivery_fee : 0;
 
                 return (
@@ -109,26 +132,43 @@ export default function CartPage() {
 
                         <ul className="divide-y">
                             {supplier.product_list.map((product) => (
-                                <li key={product.id}>
-                                    <Link
-                                        href={`/product/${product.id}`}
-                                        className="flex gap-4 py-4 hover:bg-gray-50 transition rounded-lg px-2"
-                                    >
-                                        <img
-                                            src={product.image}
-                                            alt={product.name}
-                                            className="w-20 h-20 object-cover border rounded"
-                                        />
+                                <li key={product.id} className="py-4 px-2 hover:bg-gray-50 rounded-lg transition">
+                                    <div className="flex gap-4 items-center">
+                                        <Link href={`/product/${product.id}`}>
+                                            <img
+                                                src={product.image}
+                                                alt={product.name}
+                                                className="w-20 h-20 object-cover border rounded"
+                                            />
+                                        </Link>
+
                                         <div className="flex-1">
                                             <p className="font-medium">{product.name}</p>
                                             <p className="text-sm text-gray-500">
                                                 {product.price.toLocaleString()} ₸ × {product.quantity} шт
                                             </p>
+
+                                            <div className="mt-2 flex items-center gap-2">
+                                                <button
+                                                    onClick={() => changeQuantity(product.id, supplier.id, -1)}
+                                                    className="px-3 py-1 rounded border text-sm"
+                                                >
+                                                    −
+                                                </button>
+                                                <span className="text-sm font-medium">{product.quantity}</span>
+                                                <button
+                                                    onClick={() => changeQuantity(product.id, supplier.id, 1)}
+                                                    className="px-3 py-1 rounded border text-sm"
+                                                >
+                                                    +
+                                                </button>
+                                            </div>
                                         </div>
-                                        <div className="text-right font-semibold">
+
+                                        <div className="text-right font-semibold min-w-[80px]">
                                             {(product.price * product.quantity).toLocaleString()} ₸
                                         </div>
-                                    </Link>
+                                    </div>
                                 </li>
                             ))}
                         </ul>
@@ -162,10 +202,7 @@ export default function CartPage() {
             </div>
 
             <div className="flex justify-between mt-6">
-                <button
-                    onClick={clearCart}
-                    className="btn-danger"
-                >
+                <button onClick={clearCart} className="btn-danger">
                     🗑 Очистить корзину
                 </button>
                 <button onClick={handleCheckout} className="btn-primary">

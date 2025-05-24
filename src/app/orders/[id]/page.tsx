@@ -24,22 +24,39 @@ interface Order {
     product_list: OrderProduct[];
 }
 
+interface Contract {
+    id: number;
+    content: string;
+    status: number;
+    supplier_signature?: string;
+    customer_signature?: string;
+}
+
 export default function OrderDetailPage() {
     const { id } = useParams();
     const [order, setOrder] = useState<Order | null>(null);
     const [loading, setLoading] = useState(true);
     const [role, setRole] = useState<number | null>(null);
+    const [customerName, setCustomerName] = useState<string>('');
     const [updating, setUpdating] = useState(false);
+    const [contracts, setContracts] = useState<Contract[]>([]);
 
     useEffect(() => {
         const fetchOrderAndRole = async () => {
             try {
-                const [orderRes, roleRes] = await Promise.all([
+                const [orderRes, roleRes, contractRes] = await Promise.all([
                     api.get(`/order/${id}`),
-                    api.get(`/user/role`)
+                    api.get(`/user/role`),
+                    api.get(`/contract`),
                 ]);
                 setOrder(orderRes.data);
                 setRole(roleRes.data.role);
+                setContracts(contractRes.data);
+
+                if (roleRes.data.role === 0) {
+                    const profileRes = await api.get("/user/profile");
+                    setCustomerName(profileRes.data.user.name);
+                }
             } catch (err) {
                 console.error('Ошибка загрузки данных:', err);
             } finally {
@@ -54,6 +71,11 @@ export default function OrderDetailPage() {
         if (!order) return;
         const res = await api.get(`/order/${order.id}`);
         setOrder(res.data);
+    };
+
+    const refreshContracts = async () => {
+        const res = await api.get(`/contract`);
+        setContracts(res.data);
     };
 
     const cancelOrder = async () => {
@@ -92,8 +114,26 @@ export default function OrderDetailPage() {
         }
     };
 
+    const signContract = async (contractId: number, signature: string) => {
+        setUpdating(true);
+        try {
+            await api.post("/contract/sign", {
+                contract_id: contractId,
+                signature,
+            });
+            await refreshContracts();
+        } catch (err) {
+            console.error("Ошибка при подписании контракта:", err);
+        } finally {
+            setUpdating(false);
+        }
+    };
+
     if (loading) return <p className="text-center mt-20">Загрузка заказа...</p>;
     if (!order) return <p className="text-center mt-20 text-red-500">Заказ не найден.</p>;
+
+    const relatedContracts = contracts.filter(c => c.content.includes(`#${order.id}`));
+    const totalAmount = order.product_list.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
     return (
         <div className="max-w-3xl mx-auto space-y-8">
@@ -107,7 +147,6 @@ export default function OrderDetailPage() {
                     </div>
                 </div>
 
-                {/* Клиент: отмена */}
                 {role === 0 && order.status === "Pending" && (
                     <button
                         onClick={cancelOrder}
@@ -118,7 +157,6 @@ export default function OrderDetailPage() {
                     </button>
                 )}
 
-                {/* Поставщик: смена статуса */}
                 {role === 1 && order.status === 'Pending' && (
                     <button
                         onClick={() => updateStatus('In Progress')}
@@ -169,6 +207,85 @@ export default function OrderDetailPage() {
                     </li>
                 ))}
             </ul>
+
+            {relatedContracts.length > 0 && (
+                <div className="space-y-6">
+                    <h2 className="text-xl font-semibold text-[var(--foreground)]">📃 Документы</h2>
+
+                    {relatedContracts.map((contract) => {
+                        const supplierSigned = !!contract.supplier_signature;
+                        const customerSigned = !!contract.customer_signature;
+
+                        const canSupplierSign =
+                            role === 1 && !supplierSigned && order.status === 'In Progress';
+                        const canCustomerSign =
+                            role === 0 && supplierSigned && !customerSigned;
+
+                        return (
+                            <div
+                                key={contract.id}
+                                className="border border-gray-300 rounded-xl bg-white shadow p-8 font-serif space-y-6 leading-relaxed"
+                            >
+                                <h3 className="text-2xl font-bold text-center underline mb-4">
+                                    Акт приёма-передачи товара
+                                </h3>
+
+                                <p>
+                                    Настоящий акт составлен между поставщиком <strong>{order.supplier.name}</strong> и покупателем <strong>{customerName || 'покупатель'}</strong> по заказу №{order.id} от {new Date(order.order_date).toLocaleDateString()}.
+                                </p>
+
+                                <p>
+                                    Я, <strong>{order.supplier.name}</strong>, подтверждаю, что передал(а) покупателю следующий товар:
+                                </p>
+
+                                <ul className="list-disc pl-6">
+                                    {order.product_list.map((item) => (
+                                        <li key={item.id}>
+                                            {item.name} — {item.quantity} шт по {item.price.toLocaleString()} ₸
+                                        </li>
+                                    ))}
+                                </ul>
+
+                                <p>
+                                    Общая сумма поставки составляет: <strong>{totalAmount.toLocaleString()} ₸</strong>.
+                                </p>
+
+                                <p>
+                                    Я, <strong>{customerName || 'покупатель'}</strong>, подтверждаю, что получил(а) товар в полном объёме и надлежащего качества.
+                                </p>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-6">
+                                    <div className="border-t pt-2">
+                                        <p className="text-sm font-medium">Подпись поставщика:</p>
+                                        <p className="mt-1 italic">{supplierSigned ? '✅ Подписано' : '—'}</p>
+                                    </div>
+                                    <div className="border-t pt-2">
+                                        <p className="text-sm font-medium">Подпись клиента:</p>
+                                        <p className="mt-1 italic">{customerSigned ? '✅ Подписано' : '—'}</p>
+                                    </div>
+                                </div>
+
+                                {(canSupplierSign || canCustomerSign) && (
+                                    <div className="pt-4">
+                                        <button
+                                            onClick={() =>
+                                                signContract(
+                                                    contract.id,
+                                                    role === 1 ? 'supplier' : 'user'
+                                                )
+                                            }
+                                            disabled={updating}
+                                            className="btn-primary w-full sm:w-auto"
+                                        >
+                                            ✍️ Подписать акт
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
         </div>
     );
 }

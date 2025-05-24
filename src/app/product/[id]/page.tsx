@@ -28,6 +28,9 @@ export default function ProductPage() {
     const [error, setError] = useState("");
     const { addToCart } = useCart();
 
+    const [selectedSupplier, setSelectedSupplier] = useState<number | null>(null);
+    const [quantities, setQuantities] = useState<Record<number, number>>({});
+
     useEffect(() => {
         const fetchProduct = async () => {
             try {
@@ -44,6 +47,35 @@ export default function ProductPage() {
 
         if (id) fetchProduct();
     }, [id]);
+
+    const handleSelectQuantity = (supplierId: number) => {
+        setSelectedSupplier((prev) => (prev === supplierId ? null : supplierId));
+        setQuantities((prev) => ({
+            ...prev,
+            [supplierId]: prev[supplierId] ?? 1,
+        }));
+    };
+
+    const handleChangeQuantity = (supplierId: number, delta: number) => {
+        setQuantities((prev) => {
+            const newQty = Math.max(1, (prev[supplierId] ?? 1) + delta);
+            return { ...prev, [supplierId]: newQty };
+        });
+    };
+
+    const handleAddToCart = async (supplierId: number) => {
+        const quantity = quantities[supplierId] ?? 1;
+
+        await addToCart({
+            productId: product!.id,
+            supplierId,
+            quantity,
+        });
+
+        // сброс мини-интерфейса
+        setSelectedSupplier(null);
+        setQuantities((prev) => ({ ...prev, [supplierId]: 1 }));
+    };
 
     if (loading) return <p>Загрузка...</p>;
     if (error) return <p className="text-red-600">{error}</p>;
@@ -83,44 +115,71 @@ export default function ProductPage() {
                     <p className="text-gray-500">Нет доступных поставщиков для этого товара.</p>
                 ) : (
                     <ul className="space-y-4">
-                        {suppliers.map((offer, index) => (
-                            <li
-                                key={index}
-                                className="border p-6 rounded-xl bg-white shadow flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6"
-                            >
-                                <div className="flex-1 space-y-2">
-                                    <p className="text-lg font-semibold text-[var(--foreground)]">
-                                        🏪 {offer.supplier.name}
-                                    </p>
-                                    <p className="text-gray-600 text-sm">
-                                        Минимальный заказ: {offer.supplier.order_amount.toLocaleString()} ₸
-                                    </p>
-                                    <p className="text-gray-600 text-sm">
-                                        Бесплатная доставка от: {offer.supplier.free_delivery_amount.toLocaleString()} ₸
-                                    </p>
-                                    <p className="text-gray-600 text-sm">
-                                        Стоимость доставки: {offer.supplier.delivery_fee.toLocaleString()} ₸
-                                    </p>
-                                </div>
-                                <div className="flex flex-col items-end gap-3 min-w-[140px]">
-                                    <p className="text-xl font-bold text-[var(--primary)]">
-                                        {offer.price.toLocaleString()} ₸
-                                    </p>
-                                    <button
-                                        onClick={() =>
-                                            addToCart({
-                                                productId: product.id,
-                                                supplierId: offer.supplier.id,
-                                                quantity: 1,
-                                            })
-                                        }
-                                        className="bg-[var(--primary)] text-white text-sm px-4 py-2 rounded hover:bg-[var(--primary-hover)] transition"
-                                    >
-                                        В корзину
-                                    </button>
-                                </div>
-                            </li>
-                        ))}
+                        {suppliers.map((offer) => {
+                            const isSelected = selectedSupplier === offer.supplier.id;
+                            const quantity = quantities[offer.supplier.id] ?? 1;
+
+                            return (
+                                <li
+                                    key={offer.supplier.id}
+                                    className="border p-6 rounded-xl bg-white shadow flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6"
+                                >
+                                    <div className="flex-1 space-y-2">
+                                        <p className="text-lg font-semibold text-[var(--foreground)]">
+                                            🏪 {offer.supplier.name}
+                                        </p>
+                                        <p className="text-gray-600 text-sm">
+                                            Минимальный заказ: {offer.supplier.order_amount.toLocaleString()} ₸
+                                        </p>
+                                        <p className="text-gray-600 text-sm">
+                                            Бесплатная доставка от: {offer.supplier.free_delivery_amount.toLocaleString()} ₸
+                                        </p>
+                                        <p className="text-gray-600 text-sm">
+                                            Стоимость доставки: {offer.supplier.delivery_fee.toLocaleString()} ₸
+                                        </p>
+                                    </div>
+
+                                    <div className="flex flex-col items-end gap-3 min-w-[160px] w-full sm:w-auto">
+                                        <p className="text-xl font-bold text-[var(--primary)]">
+                                            {offer.price.toLocaleString()} ₸
+                                        </p>
+
+                                        {!isSelected ? (
+                                            <button
+                                                onClick={() => handleSelectQuantity(offer.supplier.id)}
+                                                className="bg-[var(--primary)] text-white text-sm px-4 py-2 rounded hover:bg-[var(--primary-hover)] transition"
+                                            >
+                                                Выбрать количество
+                                            </button>
+                                        ) : (
+                                            <div className="w-full flex flex-col items-end gap-2">
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => handleChangeQuantity(offer.supplier.id, -1)}
+                                                        className="px-3 py-1 rounded border text-sm"
+                                                    >
+                                                        −
+                                                    </button>
+                                                    <span className="font-medium">{quantity}</span>
+                                                    <button
+                                                        onClick={() => handleChangeQuantity(offer.supplier.id, 1)}
+                                                        className="px-3 py-1 rounded border text-sm"
+                                                    >
+                                                        +
+                                                    </button>
+                                                </div>
+                                                <button
+                                                    onClick={() => handleAddToCart(offer.supplier.id)}
+                                                    className="w-full bg-[var(--primary)] text-white text-sm px-4 py-2 rounded hover:bg-[var(--primary-hover)] transition"
+                                                >
+                                                    Добавить
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </li>
+                            );
+                        })}
                     </ul>
                 )}
             </div>

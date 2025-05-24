@@ -26,13 +26,15 @@ export default function ProfilePage() {
     const [editing, setEditing] = useState(false);
     const [editForm, setEditForm] = useState({ name: "", phone_number: "" });
     const [loading, setLoading] = useState(true);
+    const [role, setRole] = useState<number | null>(null);
 
     useEffect(() => {
         const loadData = async () => {
             try {
-                const [profileRes, addressRes] = await Promise.all([
+                const [profileRes, addressRes, roleRes] = await Promise.all([
                     api.get("/user/profile"),
-                    api.get("/user/address")
+                    api.get("/user/address"),
+                    api.get("/user/role")
                 ]);
 
                 setProfile(profileRes.data.user);
@@ -42,6 +44,7 @@ export default function ProfilePage() {
                 });
 
                 setAddresses(addressRes.data.address_list || []);
+                setRole(roleRes.data.role);
             } catch (e) {
                 console.error("Ошибка загрузки профиля", e);
             } finally {
@@ -51,6 +54,15 @@ export default function ProfilePage() {
 
         loadData();
     }, []);
+
+    const getRoleLabel = (role: number | null): string => {
+        switch (role) {
+            case 0: return "Клиент";
+            case 1: return "Поставщик";
+            case 2: return "Администратор";
+            default: return "Неизвестно";
+        }
+    };
 
     const handleSaveProfile = async () => {
         try {
@@ -84,6 +96,7 @@ export default function ProfilePage() {
                 <div>
                     <h1 className="text-2xl font-bold text-[var(--foreground)]">{profile.name}</h1>
                     <p className="text-gray-600">{profile.phone_number}</p>
+                    <p className="text-sm text-gray-500">Роль: <span className="font-medium">{getRoleLabel(role)}</span></p>
                 </div>
             </div>
 
