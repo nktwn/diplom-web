@@ -176,7 +176,6 @@ export default function CartPage() {
 
 ===== 📁 src/app/catalog/page.tsx =====
 
-// src/app/catalog/page.tsx
 'use client';
 
 import { useEffect, useState } from "react";
@@ -189,6 +188,7 @@ const LIMIT = 20;
 export default function CatalogPage() {
     const [products, setProducts] = useState<Product[]>([]);
     const [page, setPage] = useState(0);
+    const [hasNextPage, setHasNextPage] = useState(true);
 
     useEffect(() => {
         const fetchProducts = async () => {
@@ -200,6 +200,7 @@ export default function CatalogPage() {
                     },
                 });
                 setProducts(res.data.product_list);
+                setHasNextPage(res.data.product_list.length === LIMIT);
             } catch (e) {
                 console.error("Не удалось загрузить продукты:", e);
             }
@@ -208,29 +209,67 @@ export default function CatalogPage() {
         fetchProducts();
     }, [page]);
 
+    // ближайшие страницы вокруг текущей
+    const getNearbyPages = () => {
+        const pages = [];
+        for (let i = Math.max(0, page - 2); i <= page + 2; i++) {
+            if (i === page + 1 && !hasNextPage) break; // не рисуем "следующую" если её нет
+            pages.push(i);
+        }
+        return pages;
+    };
+
     return (
-        <div className="space-y-8">
-            <h1 className="text-2xl font-bold">Каталог</h1>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-6">
-                {products.map((product) => (
-                    <ProductCard key={product.id} product={product} />
-                ))}
-            </div>
-            <div className="flex justify-center gap-2 mt-8">
-                <button
-                    disabled={page === 0}
-                    onClick={() => setPage((p) => Math.max(0, p - 1))}
-                    className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
-                >
-                    Назад
-                </button>
-                <button
-                    onClick={() => setPage((p) => p + 1)}
-                    className="px-3 py-1 bg-gray-200 rounded"
-                >
-                    Вперед
-                </button>
-            </div>
+        <div className="w-[90%] mx-auto px-4 py-8 space-y-10">
+            <section className="rounded-xl border shadow p-4 bg-gradient-to-br from-[var(--primary)]/10 to-white w-full">
+                <h1 className="text-2xl font-bold mb-6 text-[var(--foreground)]">🛍️ Каталог товаров</h1>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-6">
+                    {products.map((product) => (
+                        <ProductCard key={product.id} product={product} />
+                    ))}
+                </div>
+
+                {/* Pagination */}
+                <div className="flex justify-center mt-10">
+                    <div className="inline-flex gap-2 flex-wrap justify-center items-center">
+                        {/* ← */}
+                        <button
+                            onClick={() => setPage((p) => Math.max(0, p - 1))}
+                            disabled={page === 0}
+                            className="px-4 py-2 rounded-lg border text-sm font-medium transition disabled:opacity-50
+                bg-white text-[#14b8a6] border-[#14b8a6] hover:bg-[#14b8a6] hover:text-white"
+                        >
+                            ←
+                        </button>
+
+                        {/* numbered pages */}
+                        {getNearbyPages().map((p) => (
+                            <button
+                                key={p}
+                                onClick={() => setPage(p)}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition border ${
+                                    p === page
+                                        ? "bg-[#14b8a6] text-white border-[#14b8a6]"
+                                        : "bg-white text-[#14b8a6] border-[#14b8a6] hover:bg-[#14b8a6] hover:text-white"
+                                }`}
+                            >
+                                {p + 1}
+                            </button>
+                        ))}
+
+                        {/* → */}
+                        <button
+                            onClick={() => setPage((p) => p + 1)}
+                            disabled={!hasNextPage}
+                            className="px-4 py-2 rounded-lg border text-sm font-medium transition disabled:opacity-50
+                bg-white text-[#14b8a6] border-[#14b8a6] hover:bg-[#14b8a6] hover:text-white"
+                        >
+                            →
+                        </button>
+                    </div>
+                </div>
+            </section>
         </div>
     );
 }
@@ -260,6 +299,20 @@ body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: 'Inter', sans-serif;
+}
+
+/* globals.css или components.css */
+
+.btn-primary {
+  @apply bg-[#14b8a6] text-white px-4 py-2 rounded shadow hover:bg-[#0d9488] transition text-sm;
+}
+
+.btn-outline-primary {
+  @apply text-[#14b8a6] border border-[#14b8a6] px-4 py-2 rounded shadow hover:bg-[#14b8a6]/10 transition text-sm;
+}
+
+.btn-danger {
+  @apply text-red-600 border border-red-600 px-4 py-2 rounded shadow hover:bg-red-50 transition text-sm;
 }
 
 
@@ -659,12 +712,170 @@ export default function ProductPage() {
 
 ===== 📁 src/app/profile/page.tsx =====
 
-// app/profile/page.tsx
+'use client';
+
+import { useEffect, useState } from "react";
+import api from "@/lib/axios";
+import { useAuth } from "@/hooks/useAuth";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+
+interface Address {
+    description: string;
+    street: string;
+}
+
+interface UserProfile {
+    id: number;
+    name: string;
+    phone_number: string;
+}
+
 export default function ProfilePage() {
+    const { logout } = useAuth();
+    const router = useRouter();
+
+    const [profile, setProfile] = useState<UserProfile | null>(null);
+    const [addresses, setAddresses] = useState<Address[]>([]);
+    const [editing, setEditing] = useState(false);
+    const [editForm, setEditForm] = useState({ name: "", phone_number: "" });
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const loadData = async () => {
+            try {
+                const [profileRes, addressRes] = await Promise.all([
+                    api.get("/user/profile"),
+                    api.get("/user/address")
+                ]);
+
+                setProfile(profileRes.data.user);
+                setEditForm({
+                    name: profileRes.data.user.name,
+                    phone_number: profileRes.data.user.phone_number,
+                });
+
+                setAddresses(addressRes.data.address_list || []);
+            } catch (e) {
+                console.error("Ошибка загрузки профиля", e);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadData();
+    }, []);
+
+    const handleSaveProfile = async () => {
+        try {
+            await api.put("/user/profile", editForm);
+            setProfile((prev) => prev ? { ...prev, ...editForm } : null);
+            setEditing(false);
+        } catch (e) {
+            alert("Ошибка при обновлении профиля");
+        }
+    };
+
+    const handleLogout = async () => {
+        await logout();
+        router.push("/login");
+    };
+
+    if (loading) return <p className="text-center mt-20">Загрузка профиля...</p>;
+    if (!profile) return <p className="text-center mt-20 text-red-600">Не удалось загрузить профиль</p>;
+
     return (
-        <div className="text-center mt-20">
-            <h1 className="text-3xl font-bold">Профиль</h1>
-            <p className="mt-2 text-gray-600">Страница профиля в разработке.</p>
+        <div className="max-w-2xl mx-auto space-y-6 pt-12">
+            {/* Фото + имя + телефон */}
+            <div className="flex flex-col items-center gap-4 text-center">
+                <Image
+                    src="/profile.png"
+                    alt="Фото профиля"
+                    width={100}
+                    height={100}
+                    className="rounded-full border shadow-md"
+                />
+                <div>
+                    <h1 className="text-2xl font-bold text-[var(--foreground)]">{profile.name}</h1>
+                    <p className="text-gray-600">{profile.phone_number}</p>
+                </div>
+            </div>
+
+            {/* Редактирование профиля */}
+            <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl shadow p-6 space-y-4">
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">Имя</label>
+                        <input
+                            type="text"
+                            value={editForm.name}
+                            disabled={!editing}
+                            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                            className="w-full border rounded px-4 py-2 mt-1"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">Телефон</label>
+                        <input
+                            type="tel"
+                            value={editForm.phone_number}
+                            disabled={!editing}
+                            onChange={(e) => setEditForm({ ...editForm, phone_number: e.target.value })}
+                            className="w-full border rounded px-4 py-2 mt-1"
+                        />
+                    </div>
+
+                    <div className="flex justify-end">
+                        {editing ? (
+                            <button
+                                onClick={handleSaveProfile}
+                                className="btn-primary"
+                            >
+                                💾 Сохранить
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => setEditing(true)}
+                                className="btn-outline-primary"
+                            >
+                                ✏️ Редактировать
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* Список адресов */}
+            <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl shadow p-6 space-y-4">
+                <h2 className="text-xl font-semibold mb-2">Мои адреса</h2>
+
+                {addresses.length === 0 ? (
+                    <p className="text-gray-500">Адреса не найдены.</p>
+                ) : (
+                    <ul className="space-y-3">
+                        {addresses.map((addr, idx) => (
+                            <li
+                                key={idx}
+                                className="border border-[var(--card-border)] rounded p-4 bg-white shadow-sm"
+                            >
+                                <p className="font-medium">{addr.description}</p>
+                                <p className="text-gray-600 text-sm">{addr.street}</p>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </div>
+
+            {/* Logout */}
+            <div className="text-center">
+                <button
+                    onClick={handleLogout}
+                    className="btn-danger"
+                >
+                    🚪 Выйти из аккаунта
+                </button>
+            </div>
         </div>
     );
 }
@@ -1031,7 +1242,7 @@ export { useAuth } from "@/context/AuthContext";
 import axios from "axios";
 
 const api = axios.create({
-    baseURL: "http://188.227.35.6:8080/api", // ✅ изменено с localhost
+    baseURL: "http://188.227.35.6:8080/api",
     withCredentials: false,
 });
 

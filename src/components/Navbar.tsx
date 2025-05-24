@@ -15,11 +15,15 @@ export default function Navbar() {
                 <div className="space-x-6 text-lg font-medium text-[var(--foreground)]">
                     <Link href="/cart" className="hover:text-[var(--primary)]">Корзина</Link>
                     {user ? (
-                        <Link href="/profile" className="hover:text-[var(--primary)]">Профиль</Link>
+                        <>
+                            <Link href="/orders" className="hover:text-[var(--primary)]">Заказы</Link>
+                            <Link href="/profile" className="hover:text-[var(--primary)]">Профиль</Link>
+                        </>
                     ) : (
                         <Link href="/login" className="hover:text-[var(--primary)]">Войти</Link>
                     )}
                 </div>
+
             </div>
         </nav>
 
