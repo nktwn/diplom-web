@@ -17,6 +17,7 @@ export default function Navbar() {
                     {user ? (
                         <>
                             <Link href="/orders" className="hover:text-[var(--primary)]">Заказы</Link>
+                            <Link href="/analytics" className="hover:text-[var(--primary)]">Аналитика</Link>
                             <Link href="/profile" className="hover:text-[var(--primary)]">Профиль</Link>
                         </>
                     ) : (

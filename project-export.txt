@@ -11,6 +11,10 @@ postcss.config.mjs
 project-export.txt
 src/
 │  ├─ app/
+│  │  ├─ add-gtin/
+│  │  │  ├─ page.tsx
+│  │  ├─ analytics/
+│  │  │  ├─ page.tsx
 │  │  ├─ cart/
 │  │  │  ├─ page.tsx
 │  │  ├─ catalog/
@@ -111,6 +115,285 @@ export default config;
 
 
 
+===== 📁 src/app/add-gtin/page.tsx =====
+
+'use client';
+
+import { useState } from 'react';
+import api from '@/lib/axios';
+
+interface ExternalProduct {
+    name: string;
+    image: string;
+    brand: string;
+    gtin: string;
+    description: string;
+}
+
+export default function AddByGTINPage() {
+    const [gtin, setGtin] = useState('');
+    const [product, setProduct] = useState<ExternalProduct | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [success, setSuccess] = useState(false);
+    const [error, setError] = useState('');
+
+    const handleSearch = async () => {
+        setLoading(true);
+        setProduct(null);
+        setError('');
+        setSuccess(false);
+
+        try {
+            // 🔄 Пример запроса — замени на реальный источник данных по GTIN
+            const res = await api.get(`/external/gtin/${gtin}`);
+            setProduct(res.data);
+        } catch (e: any) {
+            setError('Товар не найден или ошибка запроса');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleAdd = async () => {
+        if (!product) return;
+        try {
+            await api.post('/product/create', {
+                name: product.name,
+                image: product.image,
+                brand: product.brand,
+                gtin: product.gtin,
+                description: product.description,
+            });
+            setSuccess(true);
+        } catch (e) {
+            alert('Ошибка при добавлении товара');
+        }
+    };
+
+    return (
+        <div className="max-w-xl mx-auto space-y-8 pt-20">
+            <h1 className="text-3xl font-bold">🔍 Добавление по GTIN</h1>
+
+            <div className="flex gap-2">
+                <input
+                    type="text"
+                    placeholder="Введите GTIN (штрихкод)"
+                    value={gtin}
+                    onChange={(e) => setGtin(e.target.value)}
+                    className="flex-1 border px-4 py-2 rounded"
+                />
+                <button onClick={handleSearch} className="btn-primary">Поиск</button>
+            </div>
+
+            {loading && <p>Загрузка...</p>}
+            {error && <p className="text-red-600">{error}</p>}
+            {success && <p className="text-green-600">✅ Товар успешно добавлен</p>}
+
+            {product && (
+                <div className="border rounded-xl p-6 bg-white shadow space-y-4">
+                    <img src={product.image} alt={product.name} className="w-40 h-40 object-contain mx-auto" />
+                    <h2 className="text-xl font-semibold text-center">{product.name}</h2>
+                    <p className="text-center text-gray-600">{product.brand}</p>
+                    <p className="text-sm text-gray-500">{product.description}</p>
+
+                    <div className="text-center">
+                        <button onClick={handleAdd} className="btn-primary">➕ Добавить в каталог</button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+
+
+===== 📁 src/app/analytics/page.tsx =====
+
+'use client';
+
+import { useEffect, useState } from 'react';
+import {
+    Bar, Line, Doughnut,
+} from 'react-chartjs-2';
+import {
+    Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Tooltip, Legend,
+} from 'chart.js';
+import api from '@/lib/axios';
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Tooltip, Legend);
+
+export default function AnalyticsPage() {
+    const [role, setRole] = useState<number | null>(null);
+
+    useEffect(() => {
+        const fetchRole = async () => {
+            try {
+                const res = await api.get("/user/role");
+                setRole(res.data.role);
+            } catch (e) {
+                console.error("Ошибка определения роли:", e);
+            }
+        };
+
+        fetchRole();
+    }, []);
+
+    if (role === null) return <p className="text-center mt-20">Загрузка роли...</p>;
+
+    return (
+        <div className="max-w-6xl mx-auto space-y-12 pt-20">
+            <h1 className="text-3xl font-bold text-[var(--foreground)]">📊 Моя аналитика</h1>
+
+            {role === 0 ? <ClientAnalytics /> : <SupplierAnalytics />}
+        </div>
+    );
+}
+
+function ClientAnalytics() {
+    const data = {
+        ordersCount: 28,
+        completedCount: 22,
+        totalSpent: 185000,
+        orderStats: [2, 4, 3, 5, 6, 4, 4], // по дням недели
+        statusBreakdown: { pending: 3, inProgress: 2, completed: 22, cancelled: 1 },
+    };
+
+    return (
+        <>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                <SummaryCard title="Мои заказы" value={data.ordersCount.toString()} />
+                <SummaryCard title="Завершены" value={data.completedCount.toString()} />
+                <SummaryCard title="Потрачено (₸)" value={data.totalSpent.toLocaleString()} />
+            </div>
+
+            <section className="bg-white rounded-xl shadow p-6">
+                <h2 className="text-xl font-semibold mb-4">📈 Заказы по дням</h2>
+                <Line
+                    data={{
+                        labels: ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"],
+                        datasets: [{
+                            label: 'Кол-во заказов',
+                            data: data.orderStats,
+                            borderColor: '#3b82f6',
+                            backgroundColor: '#3b82f620',
+                            fill: true,
+                        }],
+                    }}
+                />
+            </section>
+
+            <section className="bg-white rounded-xl shadow p-6">
+                <h2 className="text-xl font-semibold mb-4">📦 Статусы моих заказов</h2>
+
+                <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                    <Doughnut
+                        data={{
+                            labels: ['Ожидает', 'В процессе', 'Завершён', 'Отменён'],
+                            datasets: [{
+                                data: [
+                                    data.statusBreakdown.pending,
+                                    data.statusBreakdown.inProgress,
+                                    data.statusBreakdown.completed,
+                                    data.statusBreakdown.cancelled,
+                                ],
+                                backgroundColor: ['#facc15', '#3b82f6', '#10b981', '#ef4444'],
+                            }],
+                        }}
+                        options={{ responsive: false, plugins: { legend: { display: true, position: 'right' } } }}
+                        width={200}
+                        height={200}
+                    />
+
+                    <div className="flex-1 space-y-4">
+                        <div>
+                            <p className="text-sm font-medium text-gray-700">Прогресс завершения заказов</p>
+                            <div className="w-full bg-gray-200 h-4 rounded-full overflow-hidden mt-1">
+                                <div
+                                    className="bg-green-500 h-4"
+                                    style={{
+                                        width: `${Math.round((data.completedCount / data.ordersCount) * 100)}%`,
+                                    }}
+                                />
+                            </div>
+                            <p className="text-sm text-gray-600 mt-1">
+                                {data.completedCount} из {data.ordersCount} завершены
+                            </p>
+                        </div>
+
+                        {/* Можно добавить ещё карточку */}
+                        <div className="text-sm text-gray-600">
+                            Среднее количество заказов в неделю: <strong>~{Math.round(data.ordersCount / 4)}</strong>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </>
+    );
+}
+
+function SupplierAnalytics() {
+    const data = {
+        ordersReceived: 134,
+        totalRevenue: 2980000,
+        monthlyEarnings: [180000, 220000, 190000, 250000, 280000, 350000],
+        topProducts: [
+            { name: 'Товар A', sales: 84 },
+            { name: 'Товар B', sales: 61 },
+            { name: 'Товар C', sales: 45 },
+        ],
+    };
+
+    return (
+        <>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                <SummaryCard title="Заказов получено" value={data.ordersReceived.toString()} />
+                <SummaryCard title="Доход (₸)" value={data.totalRevenue.toLocaleString()} />
+            </div>
+
+            <section className="bg-white rounded-xl shadow p-6">
+                <h2 className="text-xl font-semibold mb-4">💸 Доход по месяцам</h2>
+                <Bar
+                    data={{
+                        labels: ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн'],
+                        datasets: [{
+                            label: '₸ Доход',
+                            data: data.monthlyEarnings,
+                            backgroundColor: '#14b8a6',
+                        }],
+                    }}
+                />
+            </section>
+
+            <section className="bg-white rounded-xl shadow p-6">
+                <h2 className="text-xl font-semibold mb-4">🔥 Топ-продажи</h2>
+                <Bar
+                    data={{
+                        labels: data.topProducts.map(p => p.name),
+                        datasets: [{
+                            label: 'Продано (шт)',
+                            data: data.topProducts.map(p => p.sales),
+                            backgroundColor: '#f59e0b',
+                        }],
+                    }}
+                    options={{ indexAxis: 'y' }}
+                />
+            </section>
+        </>
+    );
+}
+
+function SummaryCard({ title, value }: { title: string, value: string }) {
+    return (
+        <div className="bg-white rounded-xl shadow p-6 flex flex-col items-center justify-center text-center">
+            <p className="text-sm text-gray-500">{title}</p>
+            <h3 className="text-2xl font-bold text-[var(--foreground)]">{value}</h3>
+        </div>
+    );
+}
+
+
+
 ===== 📁 src/app/cart/page.tsx =====
 
 'use client';
@@ -186,6 +469,30 @@ export default function CartPage() {
         }
     };
 
+    const changeQuantity = async (productId: number, supplierId: number, delta: number) => {
+        try {
+            if (delta > 0) {
+                await api.post("/cart/add", {
+                    product_id: productId,
+                    supplier_id: supplierId,
+                    quantity: delta,
+                });
+            } else if (delta < 0) {
+                await api.delete("/cart/delete", {
+                    params: {
+                        product_id: productId,
+                        supplier_id: supplierId,
+                        quantity: Math.abs(delta),
+                    },
+                });
+            }
+
+            await fetchCart();
+        } catch (e) {
+            console.error("Ошибка изменения количества товара:", e);
+        }
+    };
+
     useEffect(() => {
         fetchCart();
     }, []);
@@ -209,8 +516,7 @@ export default function CartPage() {
             <h1 className="text-3xl font-bold">🛒 Ваша корзина</h1>
 
             {cartData.suppliers.map((supplier) => {
-                const needsMoreForFreeDelivery =
-                    supplier.total_amount < supplier.free_delivery_amount;
+                const needsMoreForFreeDelivery = supplier.total_amount < supplier.free_delivery_amount;
                 const deliveryFee = needsMoreForFreeDelivery ? supplier.delivery_fee : 0;
 
                 return (
@@ -224,26 +530,43 @@ export default function CartPage() {
 
                         <ul className="divide-y">
                             {supplier.product_list.map((product) => (
-                                <li key={product.id}>
-                                    <Link
-                                        href={`/product/${product.id}`}
-                                        className="flex gap-4 py-4 hover:bg-gray-50 transition rounded-lg px-2"
-                                    >
-                                        <img
-                                            src={product.image}
-                                            alt={product.name}
-                                            className="w-20 h-20 object-cover border rounded"
-                                        />
+                                <li key={product.id} className="py-4 px-2 hover:bg-gray-50 rounded-lg transition">
+                                    <div className="flex gap-4 items-center">
+                                        <Link href={`/product/${product.id}`}>
+                                            <img
+                                                src={product.image}
+                                                alt={product.name}
+                                                className="w-20 h-20 object-cover border rounded"
+                                            />
+                                        </Link>
+
                                         <div className="flex-1">
                                             <p className="font-medium">{product.name}</p>
                                             <p className="text-sm text-gray-500">
                                                 {product.price.toLocaleString()} ₸ × {product.quantity} шт
                                             </p>
+
+                                            <div className="mt-2 flex items-center gap-2">
+                                                <button
+                                                    onClick={() => changeQuantity(product.id, supplier.id, -1)}
+                                                    className="px-3 py-1 rounded border text-sm"
+                                                >
+                                                    −
+                                                </button>
+                                                <span className="text-sm font-medium">{product.quantity}</span>
+                                                <button
+                                                    onClick={() => changeQuantity(product.id, supplier.id, 1)}
+                                                    className="px-3 py-1 rounded border text-sm"
+                                                >
+                                                    +
+                                                </button>
+                                            </div>
                                         </div>
-                                        <div className="text-right font-semibold">
+
+                                        <div className="text-right font-semibold min-w-[80px]">
                                             {(product.price * product.quantity).toLocaleString()} ₸
                                         </div>
-                                    </Link>
+                                    </div>
                                 </li>
                             ))}
                         </ul>
@@ -277,10 +600,7 @@ export default function CartPage() {
             </div>
 
             <div className="flex justify-between mt-6">
-                <button
-                    onClick={clearCart}
-                    className="btn-danger"
-                >
+                <button onClick={clearCart} className="btn-danger">
                     🗑 Очистить корзину
                 </button>
                 <button onClick={handleCheckout} className="btn-primary">
@@ -729,22 +1049,39 @@ interface Order {
     product_list: OrderProduct[];
 }
 
+interface Contract {
+    id: number;
+    content: string;
+    status: number;
+    supplier_signature?: string;
+    customer_signature?: string;
+}
+
 export default function OrderDetailPage() {
     const { id } = useParams();
     const [order, setOrder] = useState<Order | null>(null);
     const [loading, setLoading] = useState(true);
     const [role, setRole] = useState<number | null>(null);
+    const [customerName, setCustomerName] = useState<string>('');
     const [updating, setUpdating] = useState(false);
+    const [contracts, setContracts] = useState<Contract[]>([]);
 
     useEffect(() => {
         const fetchOrderAndRole = async () => {
             try {
-                const [orderRes, roleRes] = await Promise.all([
+                const [orderRes, roleRes, contractRes] = await Promise.all([
                     api.get(`/order/${id}`),
-                    api.get(`/user/role`)
+                    api.get(`/user/role`),
+                    api.get(`/contract`),
                 ]);
                 setOrder(orderRes.data);
                 setRole(roleRes.data.role);
+                setContracts(contractRes.data);
+
+                if (roleRes.data.role === 0) {
+                    const profileRes = await api.get("/user/profile");
+                    setCustomerName(profileRes.data.user.name);
+                }
             } catch (err) {
                 console.error('Ошибка загрузки данных:', err);
             } finally {
@@ -759,6 +1096,11 @@ export default function OrderDetailPage() {
         if (!order) return;
         const res = await api.get(`/order/${order.id}`);
         setOrder(res.data);
+    };
+
+    const refreshContracts = async () => {
+        const res = await api.get(`/contract`);
+        setContracts(res.data);
     };
 
     const cancelOrder = async () => {
@@ -797,8 +1139,26 @@ export default function OrderDetailPage() {
         }
     };
 
+    const signContract = async (contractId: number, signature: string) => {
+        setUpdating(true);
+        try {
+            await api.post("/contract/sign", {
+                contract_id: contractId,
+                signature,
+            });
+            await refreshContracts();
+        } catch (err) {
+            console.error("Ошибка при подписании контракта:", err);
+        } finally {
+            setUpdating(false);
+        }
+    };
+
     if (loading) return <p className="text-center mt-20">Загрузка заказа...</p>;
     if (!order) return <p className="text-center mt-20 text-red-500">Заказ не найден.</p>;
+
+    const relatedContracts = contracts.filter(c => c.content.includes(`#${order.id}`));
+    const totalAmount = order.product_list.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
     return (
         <div className="max-w-3xl mx-auto space-y-8">
@@ -812,7 +1172,6 @@ export default function OrderDetailPage() {
                     </div>
                 </div>
 
-                {/* Клиент: отмена */}
                 {role === 0 && order.status === "Pending" && (
                     <button
                         onClick={cancelOrder}
@@ -823,7 +1182,6 @@ export default function OrderDetailPage() {
                     </button>
                 )}
 
-                {/* Поставщик: смена статуса */}
                 {role === 1 && order.status === 'Pending' && (
                     <button
                         onClick={() => updateStatus('In Progress')}
@@ -874,6 +1232,85 @@ export default function OrderDetailPage() {
                     </li>
                 ))}
             </ul>
+
+            {relatedContracts.length > 0 && (
+                <div className="space-y-6">
+                    <h2 className="text-xl font-semibold text-[var(--foreground)]">📃 Документы</h2>
+
+                    {relatedContracts.map((contract) => {
+                        const supplierSigned = !!contract.supplier_signature;
+                        const customerSigned = !!contract.customer_signature;
+
+                        const canSupplierSign =
+                            role === 1 && !supplierSigned && order.status === 'In Progress';
+                        const canCustomerSign =
+                            role === 0 && supplierSigned && !customerSigned;
+
+                        return (
+                            <div
+                                key={contract.id}
+                                className="border border-gray-300 rounded-xl bg-white shadow p-8 font-serif space-y-6 leading-relaxed"
+                            >
+                                <h3 className="text-2xl font-bold text-center underline mb-4">
+                                    Акт приёма-передачи товара
+                                </h3>
+
+                                <p>
+                                    Настоящий акт составлен между поставщиком <strong>{order.supplier.name}</strong> и покупателем <strong>{customerName || 'покупатель'}</strong> по заказу №{order.id} от {new Date(order.order_date).toLocaleDateString()}.
+                                </p>
+
+                                <p>
+                                    Я, <strong>{order.supplier.name}</strong>, подтверждаю, что передал(а) покупателю следующий товар:
+                                </p>
+
+                                <ul className="list-disc pl-6">
+                                    {order.product_list.map((item) => (
+                                        <li key={item.id}>
+                                            {item.name} — {item.quantity} шт по {item.price.toLocaleString()} ₸
+                                        </li>
+                                    ))}
+                                </ul>
+
+                                <p>
+                                    Общая сумма поставки составляет: <strong>{totalAmount.toLocaleString()} ₸</strong>.
+                                </p>
+
+                                <p>
+                                    Я, <strong>{customerName || 'покупатель'}</strong>, подтверждаю, что получил(а) товар в полном объёме и надлежащего качества.
+                                </p>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-6">
+                                    <div className="border-t pt-2">
+                                        <p className="text-sm font-medium">Подпись поставщика:</p>
+                                        <p className="mt-1 italic">{supplierSigned ? '✅ Подписано' : '—'}</p>
+                                    </div>
+                                    <div className="border-t pt-2">
+                                        <p className="text-sm font-medium">Подпись клиента:</p>
+                                        <p className="mt-1 italic">{customerSigned ? '✅ Подписано' : '—'}</p>
+                                    </div>
+                                </div>
+
+                                {(canSupplierSign || canCustomerSign) && (
+                                    <div className="pt-4">
+                                        <button
+                                            onClick={() =>
+                                                signContract(
+                                                    contract.id,
+                                                    role === 1 ? 'supplier' : 'user'
+                                                )
+                                            }
+                                            disabled={updating}
+                                            className="btn-primary w-full sm:w-auto"
+                                        >
+                                            ✍️ Подписать акт
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
         </div>
     );
 }
@@ -908,8 +1345,17 @@ interface Order {
     product_list: OrderProduct[];
 }
 
+interface Contract {
+    id: number;
+    content: string;
+    status: number;
+    supplier_signature?: string;
+    customer_signature?: string;
+}
+
 export default function OrdersPage() {
     const [orders, setOrders] = useState<Order[]>([]);
+    const [contracts, setContracts] = useState<Contract[]>([]);
     const [loading, setLoading] = useState(true);
     const [role, setRole] = useState<number | null>(null);
     const [updatingId, setUpdatingId] = useState<number | null>(null);
@@ -917,14 +1363,16 @@ export default function OrdersPage() {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [ordersRes, roleRes] = await Promise.all([
+                const [ordersRes, roleRes, contractsRes] = await Promise.all([
                     api.get('/order'),
                     api.get('/user/role'),
+                    api.get('/contract'),
                 ]);
                 setOrders(ordersRes.data.orders || []);
                 setRole(roleRes.data.role);
+                setContracts(contractsRes.data || []);
             } catch (err) {
-                console.error('Ошибка загрузки заказов или роли:', err);
+                console.error('Ошибка загрузки:', err);
             } finally {
                 setLoading(false);
             }
@@ -990,86 +1438,112 @@ export default function OrdersPage() {
         <div className="max-w-5xl mx-auto space-y-10">
             <h1 className="text-3xl font-bold">📦 Мои заказы</h1>
 
-            {orders.map((order) => (
-                <div key={order.id} className="border rounded-xl p-6 bg-white shadow space-y-4">
-                    <div className="flex justify-between items-center text-sm text-gray-600">
-                        <span className="font-medium">Заказ #{order.id}</span>
-                        <span>{new Date(order.order_date).toLocaleDateString()}</span>
-                    </div>
+            {orders.map((order) => {
+                const contract = contracts.find(c => c.content.includes(`#${order.id}`));
+                const customerSigned = contract?.customer_signature;
+                const supplierSigned = contract?.supplier_signature;
 
-                    <div className="flex justify-between items-center flex-wrap gap-4">
-                        <div>
-                            <h2 className="text-xl font-semibold text-[var(--foreground)]">🏪 {order.supplier.name}</h2>
-                            <div className="mt-1">{getStatusBadge(order.status)}</div>
+                return (
+                    <div key={order.id} className="border rounded-xl p-6 bg-white shadow space-y-4">
+                        <div className="flex justify-between items-center text-sm text-gray-600">
+                            <span className="font-medium">Заказ #{order.id}</span>
+                            <span>{new Date(order.order_date).toLocaleDateString()}</span>
                         </div>
 
-                        {role === 0 && order.status === 'Pending' && (
-                            <button
-                                onClick={() => cancelOrder(order.id)}
-                                disabled={updatingId === order.id}
-                                className="btn-danger text-sm"
-                            >
-                                {updatingId === order.id ? 'Отмена...' : '❌ Отменить заказ'}
-                            </button>
-                        )}
+                        <div className="flex justify-between items-center flex-wrap gap-4">
+                            <div>
+                                <h2 className="text-xl font-semibold text-[var(--foreground)]">🏪 {order.supplier.name}</h2>
+                                <div className="mt-1">{getStatusBadge(order.status)}</div>
+                            </div>
 
-                        {role === 1 && order.status === 'Pending' && (
-                            <button
-                                onClick={() => updateStatus(order.id, 'In Progress')}
-                                disabled={updatingId === order.id}
-                                className="btn-outline-primary text-sm"
-                            >
-                                🔄 Принять в работу
-                            </button>
-                        )}
-
-                        {role === 1 && order.status === 'In Progress' && (
-                            <div className="flex gap-2">
+                            {role === 0 && order.status === 'Pending' && (
                                 <button
-                                    onClick={() => updateStatus(order.id, 'Completed')}
-                                    disabled={updatingId === order.id}
-                                    className="btn-primary text-sm"
-                                >
-                                    ✅ Завершить
-                                </button>
-                                <button
-                                    onClick={() => updateStatus(order.id, 'Cancelled')}
+                                    onClick={() => cancelOrder(order.id)}
                                     disabled={updatingId === order.id}
                                     className="btn-danger text-sm"
                                 >
-                                    ❌ Отменить
+                                    {updatingId === order.id ? 'Отмена...' : '❌ Отменить заказ'}
                                 </button>
+                            )}
+
+                            {role === 1 && order.status === 'Pending' && (
+                                <button
+                                    onClick={() => updateStatus(order.id, 'In Progress')}
+                                    disabled={updatingId === order.id}
+                                    className="btn-outline-primary text-sm"
+                                >
+                                    🔄 Принять в работу
+                                </button>
+                            )}
+
+                            {role === 1 && order.status === 'In Progress' && (
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => updateStatus(order.id, 'Completed')}
+                                        disabled={updatingId === order.id}
+                                        className="btn-primary text-sm"
+                                    >
+                                        ✅ Завершить
+                                    </button>
+                                    <button
+                                        onClick={() => updateStatus(order.id, 'Cancelled')}
+                                        disabled={updatingId === order.id}
+                                        className="btn-danger text-sm"
+                                    >
+                                        ❌ Отменить
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        <Link href={`/orders/${order.id}`}>
+                            <ul className="divide-y mt-2 rounded-lg hover:shadow transition">
+                                {order.product_list.map((item) => (
+                                    <li
+                                        key={item.id}
+                                        className="flex gap-4 py-3 px-2 hover:bg-gray-50 transition cursor-pointer"
+                                    >
+                                        <img
+                                            src={item.image}
+                                            alt={item.name}
+                                            className="w-16 h-16 object-cover border rounded"
+                                        />
+                                        <div className="flex-1">
+                                            <p className="font-medium text-sm">{item.name}</p>
+                                            <p className="text-xs text-gray-500">
+                                                {item.price.toLocaleString()} ₸ × {item.quantity} шт
+                                            </p>
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        </Link>
+
+                        {/* Подписи */}
+                        {(order.status === 'In Progress' || order.status === 'Completed') && (
+                            <div className="text-sm text-gray-600 pt-2 border-t mt-4">
+                                <p>
+                                    Подпись клиента:{" "}
+                                    <span className={customerSigned ? 'text-green-600 font-medium' : 'text-red-500'}>
+                {customerSigned ? '✅ Подписано' : '❌ Не подписано'}
+            </span>
+                                </p>
+                                <p>
+                                    Подпись поставщика:{" "}
+                                    <span className={supplierSigned ? 'text-green-600 font-medium' : 'text-red-500'}>
+                {supplierSigned ? '✅ Подписано' : '❌ Не подписано'}
+            </span>
+                                </p>
                             </div>
                         )}
-                    </div>
 
-                    <Link href={`/orders/${order.id}`}>
-                        <ul className="divide-y mt-2 rounded-lg hover:shadow transition">
-                            {order.product_list.map((item) => (
-                                <li
-                                    key={item.id}
-                                    className="flex gap-4 py-3 px-2 hover:bg-gray-50 transition cursor-pointer"
-                                >
-                                    <img
-                                        src={item.image}
-                                        alt={item.name}
-                                        className="w-16 h-16 object-cover border rounded"
-                                    />
-                                    <div className="flex-1">
-                                        <p className="font-medium text-sm">{item.name}</p>
-                                        <p className="text-xs text-gray-500">
-                                            {item.price.toLocaleString()} ₸ × {item.quantity} шт
-                                        </p>
-                                    </div>
-                                </li>
-                            ))}
-                        </ul>
-                    </Link>
-                </div>
-            ))}
+                    </div>
+                );
+            })}
         </div>
     );
 }
+
 
 
 ===== 📁 src/app/page.tsx =====
@@ -1262,6 +1736,9 @@ export default function ProductPage() {
     const [error, setError] = useState("");
     const { addToCart } = useCart();
 
+    const [selectedSupplier, setSelectedSupplier] = useState<number | null>(null);
+    const [quantities, setQuantities] = useState<Record<number, number>>({});
+
     useEffect(() => {
         const fetchProduct = async () => {
             try {
@@ -1278,6 +1755,35 @@ export default function ProductPage() {
 
         if (id) fetchProduct();
     }, [id]);
+
+    const handleSelectQuantity = (supplierId: number) => {
+        setSelectedSupplier((prev) => (prev === supplierId ? null : supplierId));
+        setQuantities((prev) => ({
+            ...prev,
+            [supplierId]: prev[supplierId] ?? 1,
+        }));
+    };
+
+    const handleChangeQuantity = (supplierId: number, delta: number) => {
+        setQuantities((prev) => {
+            const newQty = Math.max(1, (prev[supplierId] ?? 1) + delta);
+            return { ...prev, [supplierId]: newQty };
+        });
+    };
+
+    const handleAddToCart = async (supplierId: number) => {
+        const quantity = quantities[supplierId] ?? 1;
+
+        await addToCart({
+            productId: product!.id,
+            supplierId,
+            quantity,
+        });
+
+        // сброс мини-интерфейса
+        setSelectedSupplier(null);
+        setQuantities((prev) => ({ ...prev, [supplierId]: 1 }));
+    };
 
     if (loading) return <p>Загрузка...</p>;
     if (error) return <p className="text-red-600">{error}</p>;
@@ -1317,44 +1823,71 @@ export default function ProductPage() {
                     <p className="text-gray-500">Нет доступных поставщиков для этого товара.</p>
                 ) : (
                     <ul className="space-y-4">
-                        {suppliers.map((offer, index) => (
-                            <li
-                                key={index}
-                                className="border p-6 rounded-xl bg-white shadow flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6"
-                            >
-                                <div className="flex-1 space-y-2">
-                                    <p className="text-lg font-semibold text-[var(--foreground)]">
-                                        🏪 {offer.supplier.name}
-                                    </p>
-                                    <p className="text-gray-600 text-sm">
-                                        Минимальный заказ: {offer.supplier.order_amount.toLocaleString()} ₸
-                                    </p>
-                                    <p className="text-gray-600 text-sm">
-                                        Бесплатная доставка от: {offer.supplier.free_delivery_amount.toLocaleString()} ₸
-                                    </p>
-                                    <p className="text-gray-600 text-sm">
-                                        Стоимость доставки: {offer.supplier.delivery_fee.toLocaleString()} ₸
-                                    </p>
-                                </div>
-                                <div className="flex flex-col items-end gap-3 min-w-[140px]">
-                                    <p className="text-xl font-bold text-[var(--primary)]">
-                                        {offer.price.toLocaleString()} ₸
-                                    </p>
-                                    <button
-                                        onClick={() =>
-                                            addToCart({
-                                                productId: product.id,
-                                                supplierId: offer.supplier.id,
-                                                quantity: 1,
-                                            })
-                                        }
-                                        className="bg-[var(--primary)] text-white text-sm px-4 py-2 rounded hover:bg-[var(--primary-hover)] transition"
-                                    >
-                                        В корзину
-                                    </button>
-                                </div>
-                            </li>
-                        ))}
+                        {suppliers.map((offer) => {
+                            const isSelected = selectedSupplier === offer.supplier.id;
+                            const quantity = quantities[offer.supplier.id] ?? 1;
+
+                            return (
+                                <li
+                                    key={offer.supplier.id}
+                                    className="border p-6 rounded-xl bg-white shadow flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6"
+                                >
+                                    <div className="flex-1 space-y-2">
+                                        <p className="text-lg font-semibold text-[var(--foreground)]">
+                                            🏪 {offer.supplier.name}
+                                        </p>
+                                        <p className="text-gray-600 text-sm">
+                                            Минимальный заказ: {offer.supplier.order_amount.toLocaleString()} ₸
+                                        </p>
+                                        <p className="text-gray-600 text-sm">
+                                            Бесплатная доставка от: {offer.supplier.free_delivery_amount.toLocaleString()} ₸
+                                        </p>
+                                        <p className="text-gray-600 text-sm">
+                                            Стоимость доставки: {offer.supplier.delivery_fee.toLocaleString()} ₸
+                                        </p>
+                                    </div>
+
+                                    <div className="flex flex-col items-end gap-3 min-w-[160px] w-full sm:w-auto">
+                                        <p className="text-xl font-bold text-[var(--primary)]">
+                                            {offer.price.toLocaleString()} ₸
+                                        </p>
+
+                                        {!isSelected ? (
+                                            <button
+                                                onClick={() => handleSelectQuantity(offer.supplier.id)}
+                                                className="bg-[var(--primary)] text-white text-sm px-4 py-2 rounded hover:bg-[var(--primary-hover)] transition"
+                                            >
+                                                Выбрать количество
+                                            </button>
+                                        ) : (
+                                            <div className="w-full flex flex-col items-end gap-2">
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => handleChangeQuantity(offer.supplier.id, -1)}
+                                                        className="px-3 py-1 rounded border text-sm"
+                                                    >
+                                                        −
+                                                    </button>
+                                                    <span className="font-medium">{quantity}</span>
+                                                    <button
+                                                        onClick={() => handleChangeQuantity(offer.supplier.id, 1)}
+                                                        className="px-3 py-1 rounded border text-sm"
+                                                    >
+                                                        +
+                                                    </button>
+                                                </div>
+                                                <button
+                                                    onClick={() => handleAddToCart(offer.supplier.id)}
+                                                    className="w-full bg-[var(--primary)] text-white text-sm px-4 py-2 rounded hover:bg-[var(--primary-hover)] transition"
+                                                >
+                                                    Добавить
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </li>
+                            );
+                        })}
                     </ul>
                 )}
             </div>
@@ -1394,13 +1927,15 @@ export default function ProfilePage() {
     const [editing, setEditing] = useState(false);
     const [editForm, setEditForm] = useState({ name: "", phone_number: "" });
     const [loading, setLoading] = useState(true);
+    const [role, setRole] = useState<number | null>(null);
 
     useEffect(() => {
         const loadData = async () => {
             try {
-                const [profileRes, addressRes] = await Promise.all([
+                const [profileRes, addressRes, roleRes] = await Promise.all([
                     api.get("/user/profile"),
-                    api.get("/user/address")
+                    api.get("/user/address"),
+                    api.get("/user/role")
                 ]);
 
                 setProfile(profileRes.data.user);
@@ -1410,6 +1945,7 @@ export default function ProfilePage() {
                 });
 
                 setAddresses(addressRes.data.address_list || []);
+                setRole(roleRes.data.role);
             } catch (e) {
                 console.error("Ошибка загрузки профиля", e);
             } finally {
@@ -1419,6 +1955,15 @@ export default function ProfilePage() {
 
         loadData();
     }, []);
+
+    const getRoleLabel = (role: number | null): string => {
+        switch (role) {
+            case 0: return "Клиент";
+            case 1: return "Поставщик";
+            case 2: return "Администратор";
+            default: return "Неизвестно";
+        }
+    };
 
     const handleSaveProfile = async () => {
         try {
@@ -1452,6 +1997,7 @@ export default function ProfilePage() {
                 <div>
                     <h1 className="text-2xl font-bold text-[var(--foreground)]">{profile.name}</h1>
                     <p className="text-gray-600">{profile.phone_number}</p>
+                    <p className="text-sm text-gray-500">Роль: <span className="font-medium">{getRoleLabel(role)}</span></p>
                 </div>
             </div>
 
@@ -1678,6 +2224,7 @@ export default function Navbar() {
                     {user ? (
                         <>
                             <Link href="/orders" className="hover:text-[var(--primary)]">Заказы</Link>
+                            <Link href="/analytics" className="hover:text-[var(--primary)]">Аналитика</Link>
                             <Link href="/profile" className="hover:text-[var(--primary)]">Профиль</Link>
                         </>
                     ) : (
