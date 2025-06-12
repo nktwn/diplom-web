@@ -11,7 +11,7 @@ export interface Supplier {
 export interface Product {
     id: number;
     name: string;
-    ImageUrl: string;
+    image: string;
     lowest_product_supplier: {
         price: number;
         sell_amount: number;

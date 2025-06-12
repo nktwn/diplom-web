@@ -88,7 +88,7 @@ export default function ProductPage() {
             {/* Основной блок */}
             <div className="bg-white border rounded-xl shadow p-6 flex flex-col sm:flex-row gap-6">
                 <img
-                    src={product.ImageUrl}
+                    src={product.image}
                     alt={product.name}
                     className="w-full sm:w-64 h-64 object-cover rounded-lg border"
                 />

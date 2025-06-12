@@ -13,7 +13,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl shadow hover:shadow-md transition-transform transform hover:-translate-y-1 cursor-pointer flex flex-col h-[340px] w-full">
                 <div className="w-full h-40 flex items-center justify-center bg-white">
                     <img
-                        src={product.ImageUrl}
+                        src={product.image}
                         alt={product.name}
                         className="max-h-full max-w-full object-contain"
                     />
