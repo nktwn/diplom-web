@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import api from '@/lib/axios';
 import Link from 'next/link';
 import { getStatusBadge } from '@/components/StatusBadge';
+import SignatureModal from '@/components/SignatureModal';
 
 interface OrderProduct {
     id: number;
@@ -38,6 +39,7 @@ export default function OrdersPage() {
     const [loading, setLoading] = useState(true);
     const [role, setRole] = useState<number | null>(null);
     const [updatingId, setUpdatingId] = useState<number | null>(null);
+    const [signingContract, setSigningContract] = useState<{ id: number, role: 'supplier' | 'user' } | null>(null);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -60,12 +62,16 @@ export default function OrdersPage() {
         fetchData();
     }, []);
 
-    const refreshOrders = async () => {
+    const refreshData = async () => {
         try {
-            const res = await api.get('/order');
-            setOrders(res.data.orders || []);
+            const [ordersRes, contractsRes] = await Promise.all([
+                api.get('/order'),
+                api.get('/contract'),
+            ]);
+            setOrders(ordersRes.data.orders || []);
+            setContracts(contractsRes.data || []);
         } catch (err) {
-            console.error('Ошибка обновления заказов:', err);
+            console.error('Ошибка обновления данных:', err);
         }
     };
 
@@ -73,7 +79,7 @@ export default function OrdersPage() {
         setUpdatingId(orderId);
         try {
             await api.post('/order/cancel', { order_id: orderId });
-            await refreshOrders();
+            await refreshData();
         } catch (err) {
             console.error('Ошибка отмены заказа:', err);
         } finally {
@@ -94,11 +100,26 @@ export default function OrdersPage() {
                 order_id: orderId,
                 new_status_id: statusMap[newStatus],
             });
-            await refreshOrders();
+            await refreshData();
         } catch (err) {
             console.error('Ошибка при смене статуса:', err);
         } finally {
             setUpdatingId(null);
+        }
+    };
+
+    const handleSignature = async (code: string) => {
+        if (!signingContract) return;
+        try {
+            await api.post('/contract/sign', {
+                contract_id: signingContract.id,
+                signature: signingContract.role,
+            });
+            setSigningContract(null);
+            await refreshData();
+        } catch (err) {
+            console.error("Ошибка при подписи:", err);
+            alert("Ошибка при подписании контракта");
         }
     };
 
@@ -121,6 +142,10 @@ export default function OrdersPage() {
                 const contract = contracts.find(c => c.content.includes(`#${order.id}`));
                 const customerSigned = contract?.customer_signature;
                 const supplierSigned = contract?.supplier_signature;
+
+                const canSign = contract &&
+                    ((role === 0 && !customerSigned && supplierSigned) ||
+                        (role === 1 && !supplierSigned && order.status === 'In Progress'));
 
                 return (
                     <div key={order.id} className="border rounded-xl p-6 bg-white shadow space-y-4">
@@ -200,25 +225,45 @@ export default function OrdersPage() {
 
                         {/* Подписи */}
                         {(order.status === 'In Progress' || order.status === 'Completed') && (
-                            <div className="text-sm text-gray-600 pt-2 border-t mt-4">
+                            <div className="text-sm text-gray-600 pt-2 border-t mt-4 space-y-2">
                                 <p>
                                     Подпись клиента:{" "}
                                     <span className={customerSigned ? 'text-green-600 font-medium' : 'text-red-500'}>
-                {customerSigned ? '✅ Подписано' : '❌ Не подписано'}
-            </span>
+                                        {customerSigned ? '✅ Подписано' : '❌ Не подписано'}
+                                    </span>
                                 </p>
                                 <p>
                                     Подпись поставщика:{" "}
                                     <span className={supplierSigned ? 'text-green-600 font-medium' : 'text-red-500'}>
-                {supplierSigned ? '✅ Подписано' : '❌ Не подписано'}
-            </span>
+                                        {supplierSigned ? '✅ Подписано' : '❌ Не подписано'}
+                                    </span>
                                 </p>
+
+                                {canSign && (
+                                    <button
+                                        onClick={() =>
+                                            setSigningContract({
+                                                id: contract.id,
+                                                role: role === 1 ? 'supplier' : 'user',
+                                            })
+                                        }
+                                        className="btn-primary mt-2"
+                                    >
+                                        ✍️ Подписать акт
+                                    </button>
+                                )}
                             </div>
                         )}
-
                     </div>
                 );
             })}
+
+            {/* Модалка подписи */}
+            <SignatureModal
+                isOpen={!!signingContract}
+                onClose={() => setSigningContract(null)}
+                onConfirm={handleSignature}
+            />
         </div>
     );
 }

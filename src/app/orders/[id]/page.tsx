@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import api from '@/lib/axios';
 import { getStatusBadge } from '@/components/StatusBadge';
+import SignatureModal from '@/components/SignatureModal';
 
 interface OrderProduct {
     id: number;
@@ -40,6 +41,7 @@ export default function OrderDetailPage() {
     const [customerName, setCustomerName] = useState<string>('');
     const [updating, setUpdating] = useState(false);
     const [contracts, setContracts] = useState<Contract[]>([]);
+    const [signingContract, setSigningContract] = useState<{ id: number, role: 'supplier' | 'user' } | null>(null);
 
     useEffect(() => {
         const fetchOrderAndRole = async () => {
@@ -114,18 +116,21 @@ export default function OrderDetailPage() {
         }
     };
 
-    const signContract = async (contractId: number, signature: string) => {
+    const confirmSignature = async (code: string) => {
+        if (!signingContract) return;
         setUpdating(true);
         try {
             await api.post("/contract/sign", {
-                contract_id: contractId,
-                signature,
+                contract_id: signingContract.id,
+                signature: signingContract.role,
             });
             await refreshContracts();
         } catch (err) {
             console.error("Ошибка при подписании контракта:", err);
+            alert("Не удалось подписать документ");
         } finally {
             setUpdating(false);
+            setSigningContract(null);
         }
     };
 
@@ -269,10 +274,10 @@ export default function OrderDetailPage() {
                                     <div className="pt-4">
                                         <button
                                             onClick={() =>
-                                                signContract(
-                                                    contract.id,
-                                                    role === 1 ? 'supplier' : 'user'
-                                                )
+                                                setSigningContract({
+                                                    id: contract.id,
+                                                    role: role === 1 ? 'supplier' : 'user',
+                                                })
                                             }
                                             disabled={updating}
                                             className="btn-primary w-full sm:w-auto"
@@ -286,6 +291,12 @@ export default function OrderDetailPage() {
                     })}
                 </div>
             )}
+
+            <SignatureModal
+                isOpen={!!signingContract}
+                onClose={() => setSigningContract(null)}
+                onConfirm={confirmSignature}
+            />
         </div>
     );
 }
